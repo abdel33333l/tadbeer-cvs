@@ -19,6 +19,7 @@ const AdminPage = () => {
   const [pdfFile, setPdfFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [enhanceImages, setEnhanceImages] = useState(true);
   const [tempWhatsapp, setTempWhatsapp] = useState(whatsappNumber || '');
   
   // New Workflow States
@@ -139,7 +140,7 @@ const AdminPage = () => {
     try {
       const result = await uploadData(jsonFile, pdfFile, (progress) => {
         setCurrentProgress(progress);
-      }, uploadMode);
+      }, uploadMode, { enhance: enhanceImages });
       
       setUploadStatus({ 
         success: true, 
@@ -333,6 +334,20 @@ const AdminPage = () => {
                     <p className="text-sm font-bold text-gray-700">{pdfFile ? pdfFile.name : 'ملف الـ PDF (اختياري)'}</p>
                     <p className="text-[10px] text-gray-400">للبحث عن الصور والخبرة</p>
                   </div>
+                </div>
+
+                {/* Enhancement Toggle */}
+                <div className="flex items-center gap-3 px-1">
+                   <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={enhanceImages}
+                      onChange={(e) => setEnhanceImages(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  </label>
+                  <span className="text-xs font-black text-gray-600">تحسين جودة الصور المستخرجة من PDF تلقائياً</span>
                 </div>
 
                 <button 

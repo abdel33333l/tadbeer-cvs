@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parsePdfForWorkerData, normalizePassport } from '../utils/pdfParser';
 import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone, getZohoImageUrlCandidates, findPossibleImagePath } from '../utils/normalization';
+import { enhanceImage, resizeImage } from '../utils/imageProcessor';
 import { get, set, del } from 'idb-keyval';
 
 const WORKERS_KEY = 'tadbeer_workers_v3';
@@ -277,7 +278,7 @@ export const useWorkers = () => {
     }
   };
 
-  const uploadData = async (jsonFile, pdfFile = null, onProgress, mode = 'upsert') => {
+  const uploadData = async (jsonFile, pdfFile = null, onProgress, mode = 'upsert', options = {}) => {
     setIsLoading(true);
     try {
       // STEP 1: JSON Reading
@@ -365,9 +366,30 @@ export const useWorkers = () => {
           });
 
           if (matchingPage) {
+            let portrait = matchingPage.profileImage;
+            let fullBody = matchingPage.fullBodyImage;
+
+            // Optional Enhancement & Resizing
+            if (options.enhance) {
+              onProgress?.(`جاري تحسين جودة صورة العاملة ${i + 1}...`);
+              
+              if (portrait) {
+                const oldSize = portrait.length;
+                portrait = await enhanceImage(portrait);
+                portrait = await resizeImage(portrait, 900, 900);
+                if (import.meta.env.DEV) console.log(`Portrait enhanced: ${oldSize} -> ${portrait.length}`);
+              }
+              if (fullBody) {
+                const oldSize = fullBody.length;
+                fullBody = await enhanceImage(fullBody);
+                fullBody = await resizeImage(fullBody, 1200, 1800);
+                if (import.meta.env.DEV) console.log(`FullBody enhanced: ${oldSize} -> ${fullBody.length}`);
+              }
+            }
+
             rawWorker.WorkExperience = matchingPage.experience;
-            rawWorker.portraitImage = matchingPage.profileImage;
-            rawWorker.fullBodyImage = matchingPage.fullBodyImage;
+            rawWorker.portraitImage = portrait;
+            rawWorker.fullBodyImage = fullBody;
           }
         }
 

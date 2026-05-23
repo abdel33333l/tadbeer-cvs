@@ -1,6 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
 const dotenv = require('dotenv');
-const fs = require('fs');
 const path = require('path');
 
 // Load environment variables
@@ -9,13 +8,26 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const zohoCookie = process.env.ZOHO_COOKIE;
-const zohoBaseUrl = process.env.ZOHO_CREATOR_BASE_URL || 'https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers';
+const reportBase = (process.env.ZOHO_CREATOR_REPORT_BASE || process.env.ZOHO_CREATOR_BASE_URL || "https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers").replace(/\/+$/, "");
+const digestValue = process.env.ZOHO_DIGEST_VALUE || "eyJsYW5ndWFnZSI6ImVuIn0=";
+
 const watchMode = process.env.WATCH_MODE === 'true';
+const retryFailed = process.env.RETRY_FAILED === 'true';
 const watchInterval = parseInt(process.env.WATCH_INTERVAL_SECONDS || '30') * 1000;
 
-if (!supabaseUrl || !supabaseServiceRoleKey || !zohoCookie) {
-  console.error('\x1b[31m%s\x1b[0m', 'Error: Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or ZOHO_COOKIE in .env.local');
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  console.error('\x1b[31m%s\x1b[0m', 'Error: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
   process.exit(1);
+}
+
+// Cookie Validation
+if (!zohoCookie) {
+  console.error('\x1b[31m%s\x1b[0m', 'Error: ZOHO_COOKIE is missing. Paste a fresh Zoho cookie into .env.local');
+  process.exit(1);
+}
+
+if (zohoCookie.length < 50) {
+    console.warn('\x1b[33m%s\x1b[0m', 'Warning: ZOHO_COOKIE seems too short. Ensure you copied the full cookie string.');
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -25,29 +37,35 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
  */
 function getZohoCandidates(worker) {
   const raw = worker.raw_data || {};
-  const recordId = worker.zoho_record_id || raw.ID || raw.id;
-  const photoPath = worker.zoho_photo_path || raw.Photo || raw.photo;
+  
+  const recordId =
+    worker.zoho_record_id ||
+    raw.ID ||
+    raw.id ||
+    raw["ID"];
+
+  const photoPath =
+    worker.zoho_photo_path ||
+    raw.Photo ||
+    raw.photo ||
+    raw["Photo"];
 
   if (!recordId || !photoPath) return [];
 
-  const cleanBase = zohoBaseUrl.replace(/\/+$/, "");
   const filename = String(photoPath).split("/").pop();
+  if (!filename) return [];
 
-  const candidates = [];
+  // Use only the working download-file format with digestValue
+  const downloadUrl = `${reportBase}/${recordId}/Photo/download-file?filepath=/${encodeURIComponent(filename)}&digestValue=${encodeURIComponent(digestValue)}`;
 
-  // Format 1: download-file URL
-  if (filename) {
-    candidates.push(
-      `${cleanBase}/${recordId}/Photo/download-file?filepath=/${encodeURIComponent(filename)}`
-    );
-  }
+  // DEBUG for each worker
+  console.log(`\x1b[34m%s\x1b[0m`, `--- Worker Data ---`);
+  console.log(`Worker code: ${worker.worker_code}`);
+  console.log(`Record ID: ${recordId}`);
+  console.log(`Filename: ${filename}`);
+  console.log(`Final Zoho URL: ${downloadUrl}`);
 
-  // Format 2: relative path
-  if (String(photoPath).startsWith("/")) {
-    candidates.push(`${cleanBase}${photoPath}`);
-  }
-
-  return [...new Set(candidates)];
+  return [downloadUrl];
 }
 
 /**
@@ -63,13 +81,22 @@ async function fetchZohoImage(url) {
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+        throw new Error(`404: Zoho image URL returned 404.`);
+    }
     if (response.status === 403 || response.status === 401) {
-       throw new Error('ZOHO_COOKIE might be expired or invalid.');
+       throw new Error(`403/401: Unauthorized. Cookie may be expired.`);
     }
     throw new Error(`Zoho fetch failed with status ${response.status}`);
   }
 
   const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("text/html")) {
+    const text = await response.text();
+    console.warn(`\x1b[33m%s\x1b[0m`, `Zoho returned HTML snippet: ${text.slice(0, 300).replace(/\s+/g, ' ')}...`);
+    throw new Error(`Zoho returned HTML/login page. Cookie may be expired or digestValue is wrong.`);
+  }
 
   if (!contentType.startsWith("image/")) {
     throw new Error(`URL did not return an image. Content-Type: ${contentType}`);
@@ -121,20 +148,19 @@ async function processWorker(worker) {
   
   const candidates = getZohoCandidates(worker);
   if (candidates.length === 0) {
-    console.log('No Zoho photo path found, skipping.');
+    console.log('Insufficient data for Zoho photo import, skipping.');
     return;
   }
 
   let lastError = "";
   for (const url of candidates) {
     try {
-      console.log(`Fetching from Zoho: ${url.substring(0, 80)}...`);
       const { buffer, contentType } = await fetchZohoImage(url);
       
       console.log(`Uploading to Supabase Storage...`);
       const publicUrl = await uploadToSupabase(worker, buffer, contentType);
       
-      console.log(`\x1b[32m%s\x1b[0m`, `Success! Public URL: ${publicUrl}`);
+      console.log(`\x1b[32m%s\x1b[0m`, `Success! Photo uploaded.`);
       
       await supabase
         .from("workers")
@@ -150,13 +176,11 @@ async function processWorker(worker) {
       return;
     } catch (error) {
       lastError = error.message;
-      console.warn(`Candidate failed: ${error.message}`);
-      if (error.message.includes('expired')) throw error; // Stop if cookie is dead
+      console.warn(`\x1b[33m%s\x1b[0m`, `Import failed: ${error.message}`);
     }
   }
 
   // All candidates failed
-  console.error(`\x1b[31m%s\x1b[0m`, `Failed to import photo for ${worker.worker_code}`);
   await supabase
     .from("workers")
     .update({
@@ -171,45 +195,42 @@ async function processWorker(worker) {
  * Main Importer Loop
  */
 async function runImporter() {
-  console.log('\x1b[36m%s\x1b[0m', 'Checking for pending worker photos in Supabase...');
+  console.log('\n\x1b[36m%s\x1b[0m', 'Checking for workers needing photo import in Supabase...');
 
-  const { data: workers, error } = await supabase
-    .from("workers")
-    .select("*")
-    .or(`photo_import_status.eq.pending,portrait_image_url.is.null`)
-    .not('zoho_photo_path', 'is', null);
+  let query = supabase.from("workers").select("*");
+  
+  if (retryFailed) {
+      query = query.or(`photo_import_status.eq.pending,photo_import_status.eq.failed,portrait_image_url.is.null`);
+  } else {
+      query = query.or(`photo_import_status.eq.pending,portrait_image_url.is.null`);
+  }
+
+  const { data: workers, error } = await query.not('zoho_photo_path', 'is', null);
 
   if (error) {
     console.error('Supabase fetch error:', error);
     return;
   }
 
-  // Filter out those that are already 'done' if they were matched by the portrait_image_url.is.null condition
   const pendingWorkers = workers.filter(w => w.photo_import_status !== 'done' && w.photo_import_status !== 'no_photo');
 
   if (pendingWorkers.length === 0) {
-    console.log('No pending photos found.');
+    console.log('No workers found matching import criteria.');
     return;
   }
 
-  console.log(`Found ${pendingWorkers.length} pending photos.`);
+  console.log(`Found ${pendingWorkers.length} workers to process.`);
 
   for (const worker of pendingWorkers) {
     try {
       await processWorker(worker);
     } catch (e) {
-      if (e.message.includes('expired')) {
-        console.error('\x1b[31m%s\x1b[0m', '\nFATAL ERROR: ' + e.message);
-        process.exit(1);
-      }
-      console.error(`Worker ${worker.worker_code} processing failed:`, e.message);
+      // Catch errors in the loop to prevent script from stopping
+      console.error(`\x1b[31m%s\x1b[0m`, `Worker ${worker.worker_code} encountered a loop error: ${e.message}`);
     }
   }
 
-  console.log('\x1b[32m%s\x1b[0m', '\nImporter task finished.');
-  if (!watchMode) {
-    console.log('Done. You can delete ZOHO_COOKIE from .env.local if you are finished.');
-  }
+  console.log('\x1b[32m%s\x1b[0m', '\nCycle finished.');
 }
 
 /**

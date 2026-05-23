@@ -106,18 +106,23 @@ Create a file named `.env.local` in the project root on your Mac:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-secret-key
 ZOHO_COOKIE=your-full-cookie-string
-ZOHO_CREATOR_BASE_URL=https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers
+ZOHO_CREATOR_REPORT_BASE=https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers
+ZOHO_DIGEST_VALUE=eyJsYW5ndWFnZSI6ImVuIn0=
 WATCH_INTERVAL_SECONDS=30
 ```
 
 ### 3. Run the Importer
-- **One-time import**:
+- **One-time import** (pending only):
   ```bash
   npm run import:zoho-photos
   ```
 - **Watch mode** (automatically imports new uploads):
   ```bash
   npm run watch:zoho-photos
+  ```
+- **Retry failed** (useful if cookie expired):
+  ```bash
+  RETRY_FAILED=true npm run import:zoho-photos
   ```
 
 ## Vercel Deployment (Production)

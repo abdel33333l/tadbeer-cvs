@@ -164,7 +164,7 @@ const convertPdfImageToDataUrl = (img) => {
     
     if (img.bitmap) {
        ctx.drawImage(img.bitmap, 0, 0);
-       return canvas.toDataURL('image/jpeg', 0.9);
+       return canvas.toDataURL('image/jpeg', 0.95);
     }
     
     if (!img.data) return null;
@@ -192,7 +192,7 @@ const convertPdfImageToDataUrl = (img) => {
     }
     
     ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.9);
+    return canvas.toDataURL('image/jpeg', 0.95);
   } catch (err) {
     console.warn("Failed to convert image to DataUrl", err);
     return null;
@@ -236,13 +236,13 @@ export const parsePdfForWorkerData = async (file) => {
 
       // 3. Fallback: Render full page to image if specific photo extraction failed
       if (!extractedPhotos.profilePhoto) {
-        const viewport = page.getViewport({ scale: 2.5 });
+        const viewport = page.getViewport({ scale: 3.0 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         await page.render({ canvasContext: context, viewport }).promise;
-        const pageRender = canvas.toDataURL('image/jpeg', 0.9);
+        const pageRender = canvas.toDataURL('image/jpeg', 0.95);
         extractedPhotos.profilePhoto = pageRender;
         extractedPhotos.fullBodyPhoto = pageRender;
       }
