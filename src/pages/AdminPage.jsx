@@ -149,6 +149,11 @@ const AdminPage = () => {
             <span className="text-sm">إجمالي العاملات: {result.total}</span>
             <span className="text-sm text-green-600 font-bold">تم الرفع بنجاح: {result.success}</span>
             <span className="text-sm text-blue-600 font-bold">تم استخراج {result.images} صورة</span>
+            {result.zohoWarning && (
+              <span className="text-xs text-amber-600 font-bold mt-1 bg-amber-50 p-2 rounded border border-amber-100">
+                ⚠ تعذر استيراد بعض صور Zoho (بسبب CORS)، وتم استخدام صور PDF إن وجدت.
+              </span>
+            )}
             {result.failed > 0 && <span className="text-sm text-red-600 font-bold">فشل رفع: {result.failed}</span>}
           </div>
         )

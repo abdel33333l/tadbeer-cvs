@@ -108,7 +108,11 @@ In the Vercel project settings, add the following Environment Variables (found i
 - `VITE_SUPABASE_URL`: Your Supabase Project URL.
 - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon Key.
 
-### 4. Build Settings
+### 6. Configure Secret Variables (Critical)
+The following variable is **required** for high-quality Zoho image import and must be added **only** in Vercel project settings (it is NOT prefixed with `VITE_`):
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase **Service Role** key (found in Supabase Dashboard > Settings > API). **DO NOT** commit this key to GitHub or use it in frontend code.
+
+### 7. Build Settings
 - **Framework Preset**: Vite
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist`

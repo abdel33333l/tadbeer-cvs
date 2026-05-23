@@ -178,70 +178,44 @@ export const useWorkers = () => {
     }
   };
 
-  const uploadImageFromUrlToSupabase = async (imageUrl, workerCode, type = "portrait") => {
+  const importZohoPortraitViaApi = async (rawWorker, workerCode) => {
+    const imageUrls = getZohoImageUrlCandidates(rawWorker);
+
+    if (!imageUrls.length) return null;
+
     try {
-      const response = await fetch(imageUrl, {
-        method: "GET",
-        mode: "cors",
+      const response = await fetch("/api/import-zoho-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageUrls,
+          workerCode,
+          type: "portrait",
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Zoho image: ${response.status}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.warn("Zoho server import failed:", result.error);
+        return null;
       }
 
-      const blob = await response.blob();
-
-      if (!blob.type.startsWith("image/")) {
-        throw new Error(`Zoho URL did not return an image. Content-Type: ${blob.type}`);
-      }
-
-      const extension =
-        blob.type.includes("png") ? "png" :
-        blob.type.includes("webp") ? "webp" :
-        "jpg";
-
-      const safeWorkerCode = String(workerCode || "unknown").replace(/[^a-zA-Z0-9_-]/g, "");
-      const filePath = `${safeWorkerCode}/${type}.${extension}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("worker-images")
-        .upload(filePath, blob, {
-          contentType: blob.type,
-          cacheControl: "31536000",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("worker-images")
-        .getPublicUrl(filePath);
-
-      return data.publicUrl;
-    } catch (err) {
-      console.warn(`Zoho image candidate fetch/upload failed: ${imageUrl}`, err);
+      return result.publicUrl;
+    } catch (error) {
+      console.warn("Zoho import API failed:", error);
       return null;
     }
-  };
-
-  const importZohoPortrait = async (rawWorker, workerCode) => {
-    const candidates = getZohoImageUrlCandidates(rawWorker);
-    if (candidates.length === 0) return null;
-
-    for (const url of candidates) {
-      const publicUrl = await uploadImageFromUrlToSupabase(url, workerCode, "portrait");
-      if (publicUrl) return publicUrl;
-    }
-
-    return null;
   };
 
   const addWorker = async (worker, shouldRefresh = true) => {
     try {
       const normalized = normalizeWorker(worker);
       
-      // 1. Try importing Zoho high-quality photo first
-      const zohoPortraitUrl = await importZohoPortrait(worker, normalized.worker_code);
+      // 1. Try importing Zoho high-quality photo via Proxy API (Resolves CORS)
+      const zohoPortraitUrl = await importZohoPortraitViaApi(worker, normalized.worker_code);
       if (zohoPortraitUrl) {
         normalized.portrait_image_url = zohoPortraitUrl;
       }
@@ -352,6 +326,7 @@ export const useWorkers = () => {
       // STEP 5: Main Upload Loop
       let successCount = 0;
       let imgCount = 0;
+      let zohoFailCount = 0;
 
       for (let i = 0; i < workersArray.length; i++) {
         const rawWorker = workersArray[i];
@@ -377,7 +352,13 @@ export const useWorkers = () => {
 
         try {
           const res = await addWorker(rawWorker, false);
-          if (res && res.portrait_image_url) imgCount++;
+          
+          // Check if Zoho import was skipped or failed
+          if (findPossibleImagePath(rawWorker) && res && !res.portrait_image_url) {
+             zohoFailCount++;
+          }
+
+          if (res && (res.portrait_image_url || res.full_body_image_url)) imgCount++;
           successCount++;
         } catch (e) {
           console.error(`Failed at worker ${i}:`, e);
@@ -390,7 +371,8 @@ export const useWorkers = () => {
         total: workersArray.length,
         success: successCount,
         failed: workersArray.length - successCount,
-        images: imgCount
+        images: imgCount,
+        zohoWarning: zohoFailCount > 0
       };
     } catch (err) {
       console.error('Upload Error:', err);
