@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, User as UserIcon, MapPin, Calendar, BookOpen, ShieldCheck, MessageCircle } from 'lucide-react';
+import { Heart, User as UserIcon, Calendar, BookOpen, ShieldCheck, MessageCircle, Phone } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 
 const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
@@ -116,19 +116,29 @@ const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
         <div className="flex gap-2">
           <button 
             onClick={() => onOpenCV(worker)}
-            className="flex-grow py-4 bg-primary text-white rounded-xl font-black hover:bg-opacity-90 active:scale-[0.98] transition-all text-base shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+            className="flex-grow py-4 bg-primary text-white rounded-xl font-black hover:bg-opacity-90 active:scale-[0.98] transition-all text-sm shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            الملف الكامل
+            عرض التفاصيل
           </button>
-          <a 
-            href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}?text=${encodeURIComponent(`مرحباً عادل، أنا مهتم بالعاملة ${worker.Worker_Name} (${worker.Worker_No})`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-4 bg-green-500 text-white rounded-xl hover:bg-green-600 active:scale-[0.98] transition-all shadow-lg shadow-green-500/20 flex items-center justify-center"
-            title={`تواصل مع ${import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}`}
-          >
-            <MessageCircle className="w-6 h-6" />
-          </a>
+          
+          <div className="flex gap-1.5">
+            <a 
+              href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}?text=${encodeURIComponent(`مرحباً عادل، أنا مهتم بالعاملة ${worker.Worker_Name} (${worker.Worker_No})`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-4 bg-green-500 text-white rounded-xl hover:bg-green-600 active:scale-[0.98] transition-all shadow-lg shadow-green-500/20 flex items-center justify-center"
+              title="واتساب"
+            >
+              <MessageCircle className="w-5 h-5" />
+            </a>
+            <a 
+              href={`tel:${import.meta.env.VITE_OFFICE_PHONE || '0508368230'}`}
+              className="p-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center"
+              title="اتصال"
+            >
+              <Phone className="w-5 h-5" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

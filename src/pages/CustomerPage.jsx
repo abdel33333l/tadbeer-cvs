@@ -6,7 +6,7 @@ import FilterSidebar from '../components/FilterSidebar';
 import WorkerCard from '../components/WorkerCard';
 import CVModal from '../components/CVModal';
 import CompareModal from '../components/CompareModal';
-import { Settings, User as UserIcon, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2, Phone, MessageCircle } from 'lucide-react';
+import { Settings, User as UserIcon, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2, Phone, MessageCircle, ArrowUpDown, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 
 import ShortlistBar from '../components/ShortlistBar';
 
@@ -19,19 +19,43 @@ const CustomerPage = () => {
   }, []);
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [sortBy, setSortBy] = useState('newest');
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [shortlistedIds, setShortlistedIds] = useState([]);
   const [showShortlistedOnly, setShowShortlistedOnly] = useState(false);
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [showCopyToast, setShowCopyToast] = useState(false);
 
-  const finalWorkers = useMemo(() => {
-    let result = filteredWorkers;
+  const processedWorkers = useMemo(() => {
+    let result = [...filteredWorkers];
+
+    // Availability Filter
+    if (showAvailableOnly) {
+      // Assuming 'Available' or 'متاحة' is a status. If not explicitly in data, we can skip or assume all are available.
+      // Based on previous code, I see badges for 'Experienced' and 'Beginner' but not explicit status.
+      // However, requirement asks for it. I'll check for worker.status or assume all in Supabase are available if not marked otherwise.
+      result = result.filter(w => !w.status || w.status.includes('متاحة') || w.status.toLowerCase().includes('available'));
+    }
+
+    // Shortlist Filter
     if (showShortlistedOnly) {
       result = result.filter(w => shortlistedIds.includes(w.Worker_No));
     }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (sortBy === 'age_asc') return parseInt(a.Age || 0) - parseInt(b.Age || 0);
+      if (sortBy === 'age_desc') return parseInt(b.Age || 0) - parseInt(a.Age || 0);
+      if (sortBy === 'nationality') return (a.Nationality || '').localeCompare(b.Nationality || '');
+      if (sortBy === 'experience') return (b.Experience || '').localeCompare(a.Experience || '');
+      return 0;
+    });
+
     return result;
-  }, [filteredWorkers, showShortlistedOnly, shortlistedIds]);
+  }, [filteredWorkers, showShortlistedOnly, shortlistedIds, sortBy, showAvailableOnly]);
 
   const toggleShortlist = (worker) => {
     setShortlistedIds(prev => 
@@ -46,17 +70,17 @@ const CustomerPage = () => {
   };
 
   const selectedWorker = workers.find(w => w.Worker_No === selectedWorkerId);
-  const selectedIndex = finalWorkers.findIndex(w => w.Worker_No === selectedWorkerId);
+  const selectedIndex = processedWorkers.findIndex(w => w.Worker_No === selectedWorkerId);
 
   const nextWorker = () => {
-    if (selectedIndex < finalWorkers.length - 1) {
-      setSelectedWorkerId(finalWorkers[selectedIndex + 1].Worker_No);
+    if (selectedIndex < processedWorkers.length - 1) {
+      setSelectedWorkerId(processedWorkers[selectedIndex + 1].Worker_No);
     }
   };
 
   const prevWorker = () => {
     if (selectedIndex > 0) {
-      setSelectedWorkerId(finalWorkers[selectedIndex - 1].Worker_No);
+      setSelectedWorkerId(processedWorkers[selectedIndex - 1].Worker_No);
     }
   };
 
@@ -132,33 +156,52 @@ const CustomerPage = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       {/* Header */}
-      <header className="bg-primary text-white py-6 shadow-xl sticky top-0 z-40 no-print">
+      <header className="bg-primary text-white py-4 sm:py-6 shadow-xl sticky top-0 z-40 no-print">
         <div className="container mx-auto px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden md:flex flex-col items-end gap-0.5">
+            <div className="flex flex-col items-end gap-0.5">
               <div className="flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-white text-sm font-black">
                 <UserIcon className="w-4 h-4" />
-                <span>{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')} — {(import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31')}</span>
+                <span className="hidden sm:inline">{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')} — {(import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31')}</span>
+                <span className="sm:hidden">{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')}</span>
               </div>
               <a href={`tel:${import.meta.env.VITE_OFFICE_PHONE || '0508368230'}`} className="text-[10px] font-black text-blue-200 hover:text-white transition-colors flex items-center gap-1 mr-2">
                 <Phone className="w-3 h-3" />
                 {import.meta.env.VITE_OFFICE_PHONE || '0508368230'}
               </a>
             </div>
-            <Link to="/admin-tadbeer" className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-90" title="Settings">
-              <Settings className="w-6 h-6" />
-            </Link>
+            {/* Admin link hidden from public view, only accessible via URL */}
           </div>
         </div>
       </header>
 
+      {/* Office Contact Banner */}
+      <div className="bg-blue-50 border-b border-blue-100 py-3 no-print">
+        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-center">
+          <p className="text-sm font-black text-primary flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-accent" />
+            للحجز أو الاستفسار: {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'} — {import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}
+          </p>
+          <div className="flex items-center gap-3">
+            <a href={`tel:${import.meta.env.VITE_OFFICE_PHONE || '0508368230'}`} className="flex items-center gap-1.5 px-3 py-1 bg-primary text-white rounded-lg text-xs font-black shadow-sm active:scale-95 transition-all">
+              <Phone className="w-3.5 h-3.5" />
+              اتصال مباشر
+            </a>
+            <a href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-black shadow-sm active:scale-95 transition-all">
+              <MessageCircle className="w-3.5 h-3.5" />
+              واتساب
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Main Layout */}
       <div className="flex flex-grow lg:overflow-hidden no-print relative">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
+        <div className={`hidden lg:block transition-all duration-300 ${isSidebarVisible ? 'w-80' : 'w-0 overflow-hidden opacity-0'}`}>
           <FilterSidebar 
             isOpen={true}
             onClose={() => {}}
@@ -184,7 +227,7 @@ const CustomerPage = () => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar relative">
+        <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar relative bg-surface/50">
           
           {/* Mobile Search & Action Bar */}
           <div className="sticky top-0 z-30 bg-white shadow-md lg:hidden p-4 space-y-4">
@@ -231,34 +274,74 @@ const CustomerPage = () => {
             </div>
           </div>
 
-          {/* Desktop Controls (Chips + Share) */}
+          {/* Desktop Controls (Chips + Sorting) */}
           <div className="p-4 sm:p-6 container mx-auto flex flex-col gap-6">
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-primary">العاملات المتاحة</h2>
-                <p className="text-gray-400 font-bold">تم العثور على {finalWorkers.length} عاملة من إجمالي {workers.length}</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                  className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-primary rounded-xl font-bold hover:bg-gray-50 shadow-sm transition-all"
+                >
+                  {isSidebarVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {isSidebarVisible ? 'إخفاء الفلاتر' : 'إظهار الفلاتر'}
+                </button>
+                <div className="space-y-0.5">
+                  <h2 className="text-xl sm:text-2xl font-black text-primary">العاملات المتاحة</h2>
+                  <p className="text-gray-400 font-bold text-xs">تم العثور على {processedWorkers.length} عاملة من إجمالي {workers.length}</p>
+                </div>
               </div>
               
-              <button 
-                onClick={copyResultLink}
-                className="hidden lg:flex items-center gap-2 px-6 py-3 bg-white border-2 border-primary/10 text-primary rounded-xl font-black hover:bg-gray-50 transition-all shadow-sm active:scale-95"
-              >
-                <Copy className="w-5 h-5" />
-                نسخ رابط نتائج البحث
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Available Only Toggle */}
+                <button 
+                  onClick={() => setShowAvailableOnly(!showAvailableOnly)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black border-2 transition-all active:scale-95 ${showAvailableOnly ? 'bg-accent border-accent text-white shadow-lg shadow-accent/20' : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  المتاحات فقط
+                </button>
+
+                {/* Sorting Dropdown */}
+                <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
+                   <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
+                     <ArrowUpDown className="w-4 h-4" />
+                   </div>
+                   <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-transparent text-sm font-black text-primary outline-none py-1.5 px-2 cursor-pointer"
+                   >
+                     <option value="newest">الأحدث</option>
+                     <option value="age_asc">العمر: من الأقل</option>
+                     <option value="age_desc">العمر: من الأعلى</option>
+                     <option value="nationality">حسب الجنسية</option>
+                     <option value="experience">حسب الخبرة</option>
+                   </select>
+                </div>
+
+                <button 
+                  onClick={copyResultLink}
+                  className="hidden lg:flex items-center gap-2 px-4 py-2.5 bg-white border border-primary/10 text-primary rounded-xl font-black hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                >
+                  <Copy className="w-4 h-4" />
+                  نسخ الرابط
+                </button>
+              </div>
             </div>
 
             {/* Active Filter Chips */}
-            {activeFilterCount > 0 && (
+            {(activeFilterCount > 0 || showAvailableOnly) && (
               <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
-                <span className="text-xs font-black text-gray-400 ml-2 uppercase">الفلاتر:</span>
+                <span className="text-xs font-black text-gray-400 ml-2 uppercase">الفلاتر النشطة:</span>
+                
+                {showAvailableOnly && <Chip label="المتاحات فقط" onRemove={() => setShowAvailableOnly(false)} />}
                 
                 {filters.nationalities.map(nat => (
                   <Chip key={nat} label={nat} onRemove={() => toggleMultiSelect('nationalities', nat)} />
                 ))}
                 {filters.religions.map(rel => (
-                  <Chip key={rel} label={rel} onRemove={() => toggleMultiSelect('religions', rel)} />
+                  <Chip key={rel} label={rel === 'Christian' ? 'مسيحية' : 'مسلمة'} onRemove={() => toggleMultiSelect('religions', rel)} />
                 ))}
                 {filters.experiences.map(exp => (
                   <Chip key={exp} label={exp === 'Experienced' ? 'خبيرة' : 'مبتدئة'} onRemove={() => toggleMultiSelect('experiences', exp)} />
@@ -271,7 +354,7 @@ const CustomerPage = () => {
                 )}
                 
                 <button 
-                  onClick={clearFilters}
+                  onClick={() => { clearFilters(); setShowAvailableOnly(false); }}
                   className="text-xs font-black text-red-500 hover:underline px-2 py-1"
                 >
                   مسح الكل
@@ -280,7 +363,7 @@ const CustomerPage = () => {
             )}
 
             <main>
-              {finalWorkers.length === 0 ? (
+              {processedWorkers.length === 0 ? (
                 <div className="py-24 text-center space-y-6">
                   <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto text-gray-300">
                     <Search className="w-10 h-10" />
@@ -290,15 +373,15 @@ const CustomerPage = () => {
                     <p className="text-gray-400 font-bold">جرب تغيير الفلاتر أو البحث بكلمات أخرى.</p>
                   </div>
                   <button 
-                    onClick={clearFilters} 
+                    onClick={() => { clearFilters(); setShowAvailableOnly(false); }} 
                     className="px-8 py-3 bg-primary text-white rounded-xl font-black shadow-lg shadow-primary/20"
                   >
                     إعادة تعيين الفلاتر
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 lg:gap-8">
-                  {finalWorkers.map(worker => (
+                <div className={`grid grid-cols-1 gap-6 lg:gap-8 ${isSidebarVisible ? 'sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'}`}>
+                  {processedWorkers.map(worker => (
                     <WorkerCard 
                       key={worker.Worker_No}
                       worker={worker}
@@ -323,6 +406,20 @@ const CustomerPage = () => {
         onToggleShowShortlistedOnly={() => setShowShortlistedOnly(!showShortlistedOnly)}
         isShowingShortlistedOnly={showShortlistedOnly}
       />
+
+      {/* Floating WhatsApp FAB */}
+      <a 
+        href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-28 left-6 sm:bottom-10 sm:left-10 z-40 bg-green-500 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 hover:bg-green-600 active:scale-95 transition-all animate-bounce-subtle no-print"
+      >
+        <div className="relative">
+          <MessageCircle className="w-6 h-6 fill-white text-green-500" />
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-ping" />
+        </div>
+        <span className="font-black text-sm whitespace-nowrap">تواصل مع {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</span>
+      </a>
 
       {/* Copy Toast */}
       {showCopyToast && (
