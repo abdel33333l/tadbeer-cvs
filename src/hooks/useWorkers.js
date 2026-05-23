@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parsePdfForWorkerData, normalizePassport } from '../utils/pdfParser';
-import { getNormalizedSkills, getNormalizedLanguages } from '../utils/normalization';
+import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone } from '../utils/normalization';
 import { get, set, del } from 'idb-keyval';
 
 const WORKERS_KEY = 'tadbeer_workers_v3';
 const WHATSAPP_KEY = 'tadbeer_whatsapp';
-const DEFAULT_WHATSAPP = import.meta.env.VITE_WHATSAPP_NUMBER || '+971508368230';
+const DEFAULT_WHATSAPP = import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230';
+const DEFAULT_PHONE = import.meta.env.VITE_OFFICE_PHONE || '0508368230';
 
 // Helper to convert Data URL to Blob
 const dataUrlToBlob = async (dataUrl) => {
@@ -20,7 +21,7 @@ const VALID_COLUMNS = [
   'marital_status', 'experience', 'skills', 'languages', 
   'portrait_image_url', 'full_body_image_url', 'work_experience', 
   'previous_experience_country', 'passport_number', 'date_of_birth', 
-  'place_of_birth', 'raw_data'
+  'place_of_birth', 'phone', 'mobile', 'raw_data'
 ];
 
 export const useWorkers = () => {
@@ -47,18 +48,31 @@ export const useWorkers = () => {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const mappedWorkers = data.map(w => ({
-          ...w.raw_data,
-          id: w.id,
-          worker_id_db: w.id, // Internal DB ID
-          portraitImage: w.portrait_image_url,
-          fullBodyImage: w.full_body_image_url,
-          Photo: w.portrait_image_url,
-          Full_Image: w.full_body_image_url,
-          Skills: w.skills || [],
-          Languages: w.languages || [],
-          WorkExperience: w.work_experience || []
-        }));
+        const mappedWorkers = data.map(w => {
+          const normalizedSkills = getNormalizedSkills(w);
+          const normalizedLangs = getNormalizedLanguages(w);
+          
+          if (normalizedSkills.length === 0 || normalizedLangs.length === 0) {
+            console.warn(`Data Warning for Worker ${w.worker_code}:`, {
+              skills: normalizedSkills,
+              langs: normalizedLangs,
+              raw_keys: Object.keys(w.raw_data || {})
+            });
+          }
+
+          return {
+            ...w.raw_data,
+            id: w.id,
+            worker_id_db: w.id,
+            portraitImage: w.portrait_image_url,
+            fullBodyImage: w.full_body_image_url,
+            Photo: w.portrait_image_url,
+            Full_Image: w.full_body_image_url,
+            Skills: normalizedSkills,
+            Languages: normalizedLangs,
+            WorkExperience: w.work_experience || []
+          };
+        });
         setWorkers(mappedWorkers);
       } else {
         await runMigration();
@@ -105,6 +119,16 @@ export const useWorkers = () => {
     // 2. Map skills and languages using robust helpers
     const skills = getNormalizedSkills(raw);
     const languages = getNormalizedLanguages(raw);
+    const phone = getWorkerPhone(raw);
+
+    if (skills.length === 0 || languages.length === 0) {
+      console.log(`Debug [${worker_code}]:`, {
+        skills,
+        languages,
+        raw_keys: Object.keys(raw || {}),
+        raw_data_keys: Object.keys(raw.raw_data || {})
+      });
+    }
 
     const work_experience = raw.WorkExperience || raw.work_experience || [];
     const previous_experience_country = raw.previous_experience_country || (work_experience.length > 0 ? work_experience[0].country : null);
@@ -124,6 +148,8 @@ export const useWorkers = () => {
       place_of_birth,
       work_experience,
       previous_experience_country,
+      phone,
+      mobile: phone,
       portrait_image_url: raw.portraitImage || raw.Photo || null,
       full_body_image_url: raw.fullBodyImage || raw.Full_Image || null,
       raw_data: raw
@@ -135,13 +161,15 @@ export const useWorkers = () => {
     
     try {
       const blob = await dataUrlToBlob(dataUrl);
-      const fileName = `${workerNo}/${type}-${Date.now()}.jpg`;
+      // Use clean folder structure: worker_code/portrait.jpg
+      const fileName = `${workerNo}/${type}.jpg`;
       
       const { error: uploadError } = await supabase.storage
         .from('worker-images')
         .upload(fileName, blob, {
           contentType: 'image/jpeg',
-          upsert: true
+          upsert: true,
+          cacheControl: '3600'
         });
 
       if (uploadError) throw uploadError;

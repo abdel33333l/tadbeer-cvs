@@ -236,13 +236,13 @@ export const parsePdfForWorkerData = async (file) => {
 
       // 3. Fallback: Render full page to image if specific photo extraction failed
       if (!extractedPhotos.profilePhoto) {
-        const viewport = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 2.5 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         await page.render({ canvasContext: context, viewport }).promise;
-        const pageRender = canvas.toDataURL('image/jpeg', 0.8);
+        const pageRender = canvas.toDataURL('image/jpeg', 0.9);
         extractedPhotos.profilePhoto = pageRender;
         extractedPhotos.fullBodyPhoto = pageRender;
       }

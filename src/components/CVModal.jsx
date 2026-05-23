@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User as UserIcon, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User as UserIcon, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award, MapPin } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 import { buildWhatsAppUrl, buildOfficeWhatsAppUrl } from '../utils/whatsapp';
-import { getNormalizedSkills, getNormalizedLanguages } from '../utils/normalization';
+import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone } from '../utils/normalization';
 
 const formatPeriod = (raw) => {
   if (!raw) return '';
@@ -55,6 +55,12 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
 
   const skills = getNormalizedSkills(worker);
   const languages = getNormalizedLanguages(worker);
+  const workerPhone = getWorkerPhone(worker);
+
+  const workerWhatsAppUrl = workerPhone ? buildWhatsAppUrl(
+    workerPhone, 
+    `Hello ${worker.Worker_Name || ""}, I am contacting you regarding your Tadbeer profile.`
+  ) : null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 lg:p-4 backdrop-blur-sm">
@@ -175,6 +181,27 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                     <MessageCircle className="w-6 h-6" />
                     أرسل الملف للمكتب
                   </a>
+
+                  {workerPhone && (
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                       <a 
+                        href={workerWhatsAppUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex flex-col items-center justify-center gap-1 py-4 bg-green-500 text-white rounded-2xl shadow-lg active:scale-95 transition-all"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                        <span className="text-xs font-black">واتساب للعاملة</span>
+                      </a>
+                      <a 
+                        href={`tel:${workerPhone}`}
+                        className="flex flex-col items-center justify-center gap-1 py-4 bg-primary text-white rounded-2xl shadow-lg active:scale-95 transition-all"
+                      >
+                        <Phone className="w-5 h-5" />
+                        <span className="text-xs font-black">اتصال بالعاملة</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Grid Details */}
@@ -250,10 +277,10 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                 <div className="text-center md:text-right space-y-2">
                   <p className="text-blue-200 font-black uppercase tracking-widest text-sm">وكالة التوظيف المعتمدة</p>
                   <h3 className="text-2xl sm:text-3xl font-black">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h3>
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-blue-100 text-sm font-bold pt-2">
-                    <span className="flex items-center gap-2"><UserIcon className="w-4 h-4" /> المسؤول: {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</span>
-                    <span className="flex items-center gap-2">📍 {import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}</span>
-                    <span dir="ltr" className="flex items-center gap-2">📱 {import.meta.env.VITE_WHATSAPP_NUMBER || '+971508368230'}</span>
+                  <div className="flex flex-col md:flex-row flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-blue-100 text-sm font-bold pt-2">
+                    <span className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg"><UserIcon className="w-4 h-4 text-blue-300" /> المسؤول: {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</span>
+                    <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-blue-300" /> {import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}</span>
+                    <span dir="ltr" className="flex items-center gap-2 hover:text-white transition-colors"><Phone className="w-4 h-4 text-blue-300" /> {import.meta.env.VITE_OFFICE_PHONE || '0508368230'}</span>
                   </div>
                 </div>
                 
@@ -265,14 +292,14 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                     className="flex items-center justify-center gap-3 px-8 py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black transition-all shadow-lg active:scale-95"
                   >
                     <MessageCircle className="w-6 h-6" />
-                    تواصل عبر واتساب
+                    تواصل مع {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'} عبر واتساب
                   </a>
                   <a 
-                    href={`tel:${(import.meta.env.VITE_WHATSAPP_NUMBER || '+971508368230').replace(/[^\d+]/g, '')}`}
+                    href={`tel:${(import.meta.env.VITE_OFFICE_PHONE || '0508368230').replace(/[^\d+]/g, '')}`}
                     className="flex items-center justify-center gap-3 px-8 py-4 bg-white text-primary hover:bg-gray-100 rounded-2xl font-black transition-all shadow-lg active:scale-95"
                   >
-                    <Phone className="w-6 h-6" />
-                    اتصل بنا الآن
+                    <Phone className="w-6 h-6 text-primary" />
+                    اتصال مباشر بالمكتب
                   </a>
                 </div>
               </div>

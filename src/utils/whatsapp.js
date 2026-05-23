@@ -4,6 +4,8 @@ export const buildWhatsAppUrl = (phoneNumber, message) => {
 };
 
 export const buildOfficeWhatsAppUrl = (officeNumber, workerName, workerNo) => {
-  const message = `مرحباً، أنا مهتم بالعاملة ${workerName} رقم ${workerNo}.\nأرجو التواصل معي.\n(عن طريق: عادل — مكتب 31)`;
+  const manager = import.meta.env.VITE_OFFICE_MANAGER || 'عادل';
+  const location = import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31';
+  const message = `مرحباً، أنا مهتم بهذه العاملة (${workerName} - ${workerNo}). الرجاء التواصل مع ${manager} - ${location}.`;
   return buildWhatsAppUrl(officeNumber, message);
 };

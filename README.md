@@ -62,6 +62,8 @@ create table workers (
   passport_number text,
   date_of_birth text,
   place_of_birth text,
+  phone text,
+  mobile text,
   raw_data jsonb
 );
 

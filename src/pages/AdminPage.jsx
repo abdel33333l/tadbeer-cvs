@@ -299,26 +299,51 @@ const AdminPage = () => {
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Save className="w-6 h-6 text-green-600" />
                 </div>
-                <h2 className="text-lg font-bold text-primary">إعدادات التطبيق</h2>
+                <h2 className="text-lg font-bold text-primary">إعدادات الهوية والتواصل</h2>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">المسؤول</label>
+                    <input 
+                      type="text" 
+                      value={import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}
+                      disabled
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg outline-none text-gray-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">الموقع / المكتب</label>
+                    <input 
+                      type="text" 
+                      value={import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}
+                      disabled
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg outline-none text-gray-400"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500">رقم واتساب المكتب</label>
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">رقم واتساب المكتب</label>
                   <input 
                     type="text" 
                     value={tempWhatsapp}
                     onChange={(e) => setTempWhatsapp(e.target.value)}
                     placeholder="+971500000000"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-accent font-mono"
                   />
                 </div>
-                <button 
-                  onClick={handleSaveSettings}
-                  className="px-8 py-2.5 bg-primary text-white rounded-lg font-bold hover:bg-opacity-90 transition-all"
-                >
-                  حفظ التعديلات
-                </button>
+                <div className="flex justify-between items-center pt-2">
+                  <button 
+                    onClick={handleSaveSettings}
+                    className="px-8 py-3 bg-primary text-white rounded-xl font-black hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20"
+                  >
+                    حفظ التعديلات
+                  </button>
+                  <p className="text-[10px] text-gray-400 max-w-[200px] text-left leading-tight">
+                    * يتم تعديل الاسم والمكتب عبر ملف <code className="bg-gray-100 px-1">.env</code> في بيئة الإنتاج.
+                  </p>
+                </div>
               </div>
             </section>
           </div>

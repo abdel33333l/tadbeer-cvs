@@ -1,21 +1,25 @@
 import React from 'react';
-import { Heart, User as UserIcon, MapPin, Calendar, BookOpen, ShieldCheck } from 'lucide-react';
+import { Heart, User as UserIcon, MapPin, Calendar, BookOpen, ShieldCheck, MessageCircle } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 
 const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
   const experienceLabel = worker.Experience === 'Experienced' ? 'خبيرة' : 'مبتدئة';
   const experienceColor = worker.Experience === 'Experienced' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800';
 
-  // Specific image logic for the card
+  // Specific image logic for the card - prioritize Supabase public URLs
   const cardImage = 
+    worker.portrait_image_url || 
     worker.portraitImage || 
     worker.profile_image || 
     worker.headshot_image || 
     worker.Photo || 
+    worker.full_body_image_url ||
     worker.fullBodyImage ||
     worker.Full_Image;
 
-  const isFullBody = !worker.portraitImage && (worker.fullBodyImage || worker.Full_Image);
+  const isFullBodyFallback = !worker.portrait_image_url && !worker.portraitImage && 
+                             !worker.profile_image && !worker.headshot_image && !worker.Photo &&
+                             (worker.full_body_image_url || worker.fullBodyImage || worker.Full_Image);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
@@ -26,7 +30,8 @@ const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
             src={cardImage} 
             alt={worker.Worker_Name} 
             loading="lazy"
-            className={`w-full h-full ${isFullBody ? 'object-contain' : 'object-cover'} object-center transition-transform duration-500 hover:scale-105`}
+            decoding="async"
+            className={`w-full h-full ${isFullBodyFallback ? 'object-contain' : 'object-cover'} object-center transition-transform duration-500 hover:scale-105`}
             onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x500?text=No+Photo'; }}
           />
         ) : (
@@ -108,12 +113,23 @@ const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
           )}
         </div>
 
-        <button 
-          onClick={() => onOpenCV(worker)}
-          className="w-full py-4 bg-primary text-white rounded-xl font-black hover:bg-opacity-90 active:scale-[0.98] transition-all text-base shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
-        >
-          عرض الملف الكامل
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => onOpenCV(worker)}
+            className="flex-grow py-4 bg-primary text-white rounded-xl font-black hover:bg-opacity-90 active:scale-[0.98] transition-all text-base shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+          >
+            الملف الكامل
+          </button>
+          <a 
+            href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}?text=${encodeURIComponent(`مرحباً عادل، أنا مهتم بالعاملة ${worker.Worker_Name} (${worker.Worker_No})`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-4 bg-green-500 text-white rounded-xl hover:bg-green-600 active:scale-[0.98] transition-all shadow-lg shadow-green-500/20 flex items-center justify-center"
+            title={`تواصل مع ${import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}`}
+          >
+            <MessageCircle className="w-6 h-6" />
+          </a>
+        </div>
       </div>
     </div>
   );

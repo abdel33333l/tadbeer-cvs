@@ -6,7 +6,7 @@ import FilterSidebar from '../components/FilterSidebar';
 import WorkerCard from '../components/WorkerCard';
 import CVModal from '../components/CVModal';
 import CompareModal from '../components/CompareModal';
-import { Settings, User as UserIcon, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2 } from 'lucide-react';
+import { Settings, User as UserIcon, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2, Phone, MessageCircle } from 'lucide-react';
 
 import ShortlistBar from '../components/ShortlistBar';
 
@@ -138,9 +138,15 @@ const CustomerPage = () => {
             <h1 className="text-xl sm:text-2xl font-black tracking-tight">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-full text-white text-sm font-black">
-              <UserIcon className="w-4 h-4" />
-              <span>{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')} — {(import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31')}</span>
+            <div className="hidden md:flex flex-col items-end gap-0.5">
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-white text-sm font-black">
+                <UserIcon className="w-4 h-4" />
+                <span>{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')} — {(import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31')}</span>
+              </div>
+              <a href={`tel:${import.meta.env.VITE_OFFICE_PHONE || '0508368230'}`} className="text-[10px] font-black text-blue-200 hover:text-white transition-colors flex items-center gap-1 mr-2">
+                <Phone className="w-3 h-3" />
+                {import.meta.env.VITE_OFFICE_PHONE || '0508368230'}
+              </a>
             </div>
             <Link to="/admin-tadbeer" className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-90" title="Settings">
               <Settings className="w-6 h-6" />
@@ -341,6 +347,35 @@ const CustomerPage = () => {
         isOpen={isCompareOpen}
         onClose={() => setIsCompareOpen(false)}
       />
+
+      {/* Footer */}
+      <footer className="bg-primary text-white py-12 px-4 border-t border-white/10 mt-12">
+        <div className="container mx-auto max-w-6xl flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="text-center md:text-right space-y-2">
+            <h2 className="text-xl font-black">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h2>
+            <p className="text-blue-200 font-bold text-sm">
+              {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'} — {import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}
+            </p>
+          </div>
+          
+          <div className="flex flex-col items-center md:items-start gap-4">
+            <div className="flex gap-4">
+               <a href={`tel:${import.meta.env.VITE_OFFICE_PHONE || '0508368230'}`} className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10">
+                 <Phone className="w-6 h-6" />
+               </a>
+               <a href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '971508368230'}`} target="_blank" rel="noopener noreferrer" className="p-4 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-2xl transition-all border border-green-500/20">
+                 <MessageCircle className="w-6 h-6" />
+               </a>
+            </div>
+            <p className="text-blue-100 font-black text-lg" dir="ltr">
+              {import.meta.env.VITE_OFFICE_PHONE || '0508368230'}
+            </p>
+          </div>
+        </div>
+        <div className="container mx-auto max-w-6xl mt-12 pt-8 border-t border-white/5 text-center">
+           <p className="text-blue-300 text-xs font-bold">جميع الحقوق محفوظة © {new Date().getFullYear()} — {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</p>
+        </div>
+      </footer>
     </div>
   );
 };
