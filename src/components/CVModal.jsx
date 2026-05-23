@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User as UserIcon, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award, MapPin } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 import { buildWhatsAppUrl, buildOfficeWhatsAppUrl } from '../utils/whatsapp';
-import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone } from '../utils/normalization';
+import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone, getWorkerSkills, getWorkerLanguages } from '../utils/normalization';
 
 const formatPeriod = (raw) => {
   if (!raw) return '';
@@ -53,8 +53,9 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
 
   const isPortraitFallback = !worker.fullBodyImage && !worker.body_image && !worker.Full_Image && (worker.portraitImage || worker.Photo);
 
-  const skills = getNormalizedSkills(worker);
-  const languages = getNormalizedLanguages(worker);
+  // Use UI helpers with exhaustive fallbacks
+  const skills = getWorkerSkills(worker);
+  const languages = getWorkerLanguages(worker);
   const workerPhone = getWorkerPhone(worker);
 
   const workerWhatsAppUrl = workerPhone ? buildWhatsAppUrl(

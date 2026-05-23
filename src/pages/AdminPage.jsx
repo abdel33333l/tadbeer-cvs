@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
+import { supabase } from '../lib/supabase';
 import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon, Loader2 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -17,6 +18,7 @@ const AdminPage = () => {
   const [jsonFile, setJsonFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [tempWhatsapp, setTempWhatsapp] = useState(whatsappNumber || '');
 
   useEffect(() => {
@@ -47,6 +49,36 @@ const AdminPage = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('tadbeer_auth');
     navigate('/');
+  };
+
+  const handleRecalculateData = async () => {
+    if (!window.confirm('هل تريد إعادة معالجة المهارات واللغات لجميع العاملات المسجلات؟ سيتم تحديث البيانات بناءً على الملفات المرفوعة مسبقاً.')) return;
+    
+    setIsProcessing(true);
+    setCurrentProgress('بدء تحديث البيانات...');
+    let count = 0;
+    
+    try {
+      const { data, error: fetchError } = await supabase.from('workers').select('*');
+      if (fetchError) throw fetchError;
+      
+      for (const workerRecord of data) {
+        count++;
+        setCurrentProgress(`جاري معالجة العاملة ${count} من ${data.length}...`);
+        if (workerRecord.raw_data) {
+          await addWorker(workerRecord.raw_data, false);
+        }
+      }
+      
+      setUploadStatus({ success: true, message: `تم تحديث بيانات ${count} عاملة بنجاح.` });
+      setTimeout(() => setUploadStatus(null), 3000);
+    } catch (err) {
+      console.error('Recalculate failed:', err);
+      setUploadStatus({ success: false, message: 'فشل تحديث البيانات.' });
+    } finally {
+      setIsProcessing(false);
+      setCurrentProgress('');
+    }
   };
 
   const handleDeleteWorker = async (id) => {
@@ -394,8 +426,29 @@ const AdminPage = () => {
                   </div>
                 </div>
 
+                <div>
+                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3 tracking-widest uppercase">صيانة البيانات</h3>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={handleRecalculateData}
+                      disabled={isProcessing || isUploading}
+                      className={`w-full py-3 rounded-lg font-black text-white text-xs transition-all flex items-center justify-center gap-2 ${isProcessing || isUploading ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-600/20'}`}
+                    >
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      إعادة معالجة المهارات واللغات
+                    </button>
+
+                    {isProcessing && currentProgress && (
+                      <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 text-purple-500 animate-spin flex-shrink-0" />
+                        <p className="text-[10px] font-bold text-purple-700">{currentProgress}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="pt-6">
-                  <button 
+                  <button
                     onClick={() => { if(window.confirm('هل أنت متأكد من مسح جميع البيانات؟')) clearAllData(); }}
                     className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-all"
                   >
@@ -403,6 +456,7 @@ const AdminPage = () => {
                     مسح جميع البيانات
                   </button>
                 </div>
+
               </div>
             </section>
           </div>

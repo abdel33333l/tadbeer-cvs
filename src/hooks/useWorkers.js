@@ -121,13 +121,10 @@ export const useWorkers = () => {
     const languages = getNormalizedLanguages(raw);
     const phone = getWorkerPhone(raw);
 
-    if (skills.length === 0 || languages.length === 0) {
-      console.log(`Debug [${worker_code}]:`, {
-        skills,
-        languages,
-        raw_keys: Object.keys(raw || {}),
-        raw_data_keys: Object.keys(raw.raw_data || {})
-      });
+    // Temporary debug only in development
+    if (import.meta.env.DEV) {
+      console.log(`Normalized skills for ${worker_code}:`, skills);
+      console.log(`Normalized languages for ${worker_code}:`, languages);
     }
 
     const work_experience = raw.WorkExperience || raw.work_experience || [];
@@ -245,6 +242,12 @@ export const useWorkers = () => {
       else if (jsonData.data && Array.isArray(jsonData.data)) workersArray = jsonData.data;
       else if (jsonData.results && Array.isArray(jsonData.results)) workersArray = jsonData.results;
       else throw new Error("تنسيق ملف JSON غير مدعوم");
+
+      // DEBUG: Log first raw worker to identify keys
+      if (workersArray.length > 0) {
+        console.log("FIRST RAW WORKER:", workersArray[0]);
+        console.log("FIRST RAW WORKER KEYS:", Object.keys(workersArray[0]));
+      }
 
       onProgress?.(`تم العثور على ${workersArray.length} عاملة. جاري معالجة البيانات...`);
 
