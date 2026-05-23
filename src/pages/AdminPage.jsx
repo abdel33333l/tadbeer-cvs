@@ -55,6 +55,40 @@ const AdminPage = () => {
     navigate('/');
   };
 
+  const clearAllWorkers = async () => {
+    const confirmation = window.prompt(
+      'سيتم حذف جميع العاملات الحالية نهائياً. للتأكيد اكتب: حذف'
+    );
+
+    if (confirmation !== "حذف" && confirmation !== "DELETE") {
+      return;
+    }
+
+    setIsProcessing(true);
+    setCurrentProgress("جاري مسح جميع البيانات...");
+    setUploadStatus(null);
+
+    try {
+      // Use the existing hook function which handles both Supabase and local state
+      await clearAllData();
+      
+      setUploadStatus({ 
+        success: true, 
+        message: "تم مسح جميع البيانات بنجاح" 
+      });
+      setTimeout(() => setUploadStatus(null), 3000);
+    } catch (err) {
+      console.error("Clear all workers error:", err);
+      setUploadStatus({ 
+        success: false, 
+        message: "فشل مسح البيانات" 
+      });
+    } finally {
+      setIsProcessing(false);
+      setCurrentProgress("");
+    }
+  };
+
   const handleRecalculateData = async () => {
     if (!window.confirm('هل تريد إعادة معالجة المهارات واللغات لجميع العاملات المسجلات؟ سيتم تحديث البيانات بناءً على الملفات المرفوعة مسبقاً.')) return;
     
@@ -472,10 +506,7 @@ const AdminPage = () => {
                   </button>
 
                   <button 
-                    onClick={() => {
-                       setUploadMode('replace');
-                       setIsConfirmModalOpen(true);
-                    }}
+                    onClick={clearAllWorkers}
                     className="w-full py-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-xs font-black hover:bg-red-100 transition-all flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
