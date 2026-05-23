@@ -242,9 +242,23 @@ export const useWorkers = () => {
 
       if (workersArray.length === 0) throw new Error("الملف لا يحتوي على أي عاملات");
 
-      // DEBUG
-      if (import.meta.env.DEV) {
-        console.log("FIRST RAW WORKER:", workersArray[0]);
+      // DEBUG: Log first raw worker to identify keys
+      if (workersArray.length > 0) {
+        const rawWorker = workersArray[0];
+        console.log("FIRST RAW WORKER:", rawWorker);
+        console.log("FIRST RAW WORKER KEYS:", Object.keys(rawWorker));
+
+        const languageRelatedKeys = Object.keys(rawWorker).filter(k =>
+          k.toLowerCase().includes("language") ||
+          k.toLowerCase().includes("english") ||
+          k.toLowerCase().includes("arabic") ||
+          k.toLowerCase().includes("knowledge") ||
+          k.includes("الإنجليزية") ||
+          k.includes("الانجليزية") ||
+          k.includes("العربية")
+        );
+        console.log("LANGUAGE RELATED KEYS:", languageRelatedKeys);
+        console.log("LANGUAGE RELATED VALUES:", languageRelatedKeys.map(k => [k, rawWorker[k]]));
       }
 
       onProgress?.(`تم التحقق من البيانات. (العدد: ${workersArray.length})`);
@@ -309,6 +323,11 @@ export const useWorkers = () => {
         }
 
         try {
+          const normalized = normalizeWorker(rawWorker);
+          // Temporary console debug for language verification
+          if (import.meta.env.DEV) {
+             console.log(`Normalized languages for ${normalized.worker_code}:`, normalized.languages);
+          }
           await addWorker(rawWorker, false);
           successCount++;
         } catch (e) {

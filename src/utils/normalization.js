@@ -87,13 +87,13 @@ export const getNormalizedLanguages = (worker) => {
 
   const containerKeys = [
     'languages', 'Languages', 'language', 'Language', 'LANGUAGES',
-    'Knowledge Of Language', 'Knowledge of Language', 'knowledge_of_language',
-    'Language SubForm', 'Language_SubForm', 'Language_SubForm.English'
+    'Knowledge Of Language', 'Knowledge of Language', 'KnowledgeOfLanguage', 'knowledge_of_language',
+    'Language SubForm', 'Language_SubForm', 'Language_SubForm.English', 'Languages SubForm', 'Languages_SubForm'
   ];
 
   let result = [];
 
-  // 1. Check container fields
+  // 1. Check container fields (Tables/Arrays/Strings)
   for (const key of containerKeys) {
     const val = worker[key] || worker.raw_data?.[key];
     if (!val) continue;
@@ -105,8 +105,8 @@ export const getNormalizedLanguages = (worker) => {
       val.forEach(item => {
         if (typeof item === 'string') result.push(item.trim());
         else if (typeof item === 'object' && item !== null) {
-          const name = item.English || item.language || item.name || item.Arabic || item.Label || Object.values(item)[0];
-          const rate = item.Rate || item.rate || item.Level || item.level || item.Percentage || item.proficiency;
+          const name = item.English || item.language || item.Language || item.name || item.Arabic || item.Label || Object.values(item)[0];
+          const rate = item.Rate || item.rate || item.Level || item.level || item.Percentage || item.proficiency || item.Value || item.Result;
           
           if (name && (rate === undefined || isYes(rate) || (typeof rate === 'number' && rate > 0) || (typeof rate === 'string' && !rate.toUpperCase().includes('NO')))) {
             result.push(rate && typeof rate !== 'boolean' && !isYes(rate) ? `${name} (${rate}${typeof rate === 'number' ? '%' : ''})` : name);
@@ -116,30 +116,44 @@ export const getNormalizedLanguages = (worker) => {
     }
     else if (typeof val === 'object') {
       Object.entries(val).forEach(([k, v]) => {
-        if (v && v !== 'NO' && v !== 'No' && v !== '0') {
+        if (v && v !== 'NO' && v !== 'No' && v !== '0' && v !== false) {
           result.push(typeof v === 'string' && !isYes(v) ? `${k} (${v})` : k);
         }
       });
     }
   }
 
-  // 2. Check individual fields
+  // 2. Check individual flat fields (English, Arabic, etc.)
   const individualLangs = {
     'English': ['English', 'english', 'ENGLISH', 'الإنجليزية', 'انجليزي'],
     'Arabic': ['Arabic', 'arabic', 'ARABIC', 'العربية', 'عربي'],
     'French': ['French', 'french', 'الفرنسية'],
-    'Hindi': ['Hindi', 'hindi', 'الهندية']
+    'Hindi': ['Hindi', 'hindi', 'الهندية'],
+    'Tagalog': ['Tagalog', 'tagalog'],
+    'Spanish': ['Spanish', 'spanish', 'الإسبانية']
   };
 
   Object.entries(individualLangs).forEach(([label, keys]) => {
     for (const key of keys) {
       const val = worker[key] || worker.raw_data?.[key];
-      if (val && (isYes(val) || (typeof val === 'string' && val.length > 2 && !val.toUpperCase().includes('NO')))) {
-        result.push(label);
-        break;
+      if (val !== undefined && val !== null) {
+        // If it's a number > 0, or a "YES" string, or a boolean true
+        if ((typeof val === 'number' && val > 0) || isYes(val)) {
+          result.push(label);
+          break;
+        }
+        // If it's a non-empty string that doesn't say "NO"
+        if (typeof val === 'string' && val.length > 0 && !['NO', 'FALSE', '0', 'EMPTY', 'NONE'].includes(val.toUpperCase().trim())) {
+          result.push(label);
+          break;
+        }
       }
     }
   });
+
+  // 3. Specific Arabic Keys
+  if (isYes(worker['الإنجليزية'] || worker.raw_data?.['الإنجليزية'] || worker['الانجليزية'] || worker.raw_data?.['الانجليزية'])) result.push('English');
+  if (isYes(worker['العربية'] || worker.raw_data?.['العربية'])) result.push('Arabic');
 
   return [...new Set(result.filter(Boolean))];
 };
@@ -164,9 +178,13 @@ export const getWorkerSkills = (worker) => {
 export const getWorkerLanguages = (worker) => {
   if (!worker) return [];
   
-  if (Array.isArray(worker.languages) && worker.languages.length > 0) return worker.languages;
-  if (Array.isArray(worker.Languages) && worker.Languages.length > 0) return worker.Languages;
+  // 1. Try pre-normalized arrays
+  const existing = Array.isArray(worker.languages) && worker.languages.length > 0 ? worker.languages :
+                   Array.isArray(worker.Languages) && worker.Languages.length > 0 ? worker.Languages : null;
   
+  if (existing) return existing;
+  
+  // 2. Otherwise re-normalize from scratch (handles raw_data and individual fields)
   return getNormalizedLanguages(worker);
 };
 
