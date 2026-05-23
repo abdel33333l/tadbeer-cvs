@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "import:zoho-photos": "node scripts/import-zoho-photos-local.js",
+    "watch:zoho-photos": "WATCH_MODE=true node scripts/import-zoho-photos-local.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",

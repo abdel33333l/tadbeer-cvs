@@ -1,24 +1,46 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ success: false, error: "Method not allowed" });
-  }
-
   try {
-    const { imageUrls, workerCode, type = "portrait" } = req.body || {};
+    // Always set content type to JSON
+    res.setHeader("Content-Type", "application/json");
+
+    if (req.method !== "POST") {
+      return res.status(405).json({
+        success: false,
+        error: "Method not allowed",
+      });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      return res.status(500).json({
+        success: false,
+        error: "Missing server Supabase environment variables",
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Support both stringified and object bodies
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { imageUrls, workerCode, type = "portrait" } = body || {};
 
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-      return res.status(400).json({ success: false, error: "Missing imageUrls" });
+      return res.status(400).json({
+        success: false,
+        error: "Missing imageUrls",
+      });
     }
 
     if (!workerCode) {
-      return res.status(400).json({ success: false, error: "Missing workerCode" });
+      return res.status(400).json({
+        success: false,
+        error: "Missing workerCode",
+      });
     }
 
     const safeWorkerCode = String(workerCode).replace(/[^a-zA-Z0-9_-]/g, "");
@@ -28,15 +50,17 @@ export default async function handler(req, res) {
 
     for (const imageUrl of imageUrls) {
       try {
-        console.log(`Server-side fetch attempt: ${imageUrl}`);
+        console.log("Trying Zoho image URL:", imageUrl);
+
         const response = await fetch(imageUrl, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
           },
         });
 
         if (!response.ok) {
-          lastError = `Zoho fetch failed ${response.status} for URL: ${imageUrl}`;
+          lastError = `Zoho fetch failed: ${response.status}`;
           console.warn(lastError);
           continue;
         }
@@ -44,7 +68,7 @@ export default async function handler(req, res) {
         const contentType = response.headers.get("content-type") || "";
 
         if (!contentType.startsWith("image/")) {
-          lastError = `Not an image: ${contentType} for URL: ${imageUrl}`;
+          lastError = `Zoho did not return image. Content-Type: ${contentType}`;
           console.warn(lastError);
           continue;
         }
@@ -57,7 +81,7 @@ export default async function handler(req, res) {
           contentType.includes("webp") ? "webp" :
           "jpg";
 
-        const filePath = `${safeWorkerCode}/${safeType}.${extension}`;
+        const filePath = `${safeWorkerCode}/${safeType}-${Date.now()}.${extension}`;
 
         const { error: uploadError } = await supabase.storage
           .from("worker-images")
@@ -68,8 +92,8 @@ export default async function handler(req, res) {
           });
 
         if (uploadError) {
-          lastError = `Supabase upload error: ${uploadError.message}`;
-          console.error(lastError);
+          lastError = uploadError.message;
+          console.error("Supabase storage upload error:", uploadError);
           continue;
         }
 
@@ -77,15 +101,13 @@ export default async function handler(req, res) {
           .from("worker-images")
           .getPublicUrl(filePath);
 
-        console.log(`Successfully imported Zoho image to: ${data.publicUrl}`);
         return res.status(200).json({
           success: true,
           publicUrl: data.publicUrl,
         });
-
       } catch (error) {
         lastError = error.message;
-        console.error(`Error processing candidate ${imageUrl}:`, error);
+        console.error("Zoho candidate failed:", error);
       }
     }
 
@@ -93,12 +115,12 @@ export default async function handler(req, res) {
       success: false,
       error: lastError || "All Zoho image URLs failed",
     });
-
   } catch (error) {
-    console.error("Critical API Error:", error);
+    console.error("Import Zoho image API fatal error:", error);
+
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message || "Internal server error",
     });
   }
 }

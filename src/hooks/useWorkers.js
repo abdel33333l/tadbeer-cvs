@@ -21,7 +21,8 @@ const VALID_COLUMNS = [
   'marital_status', 'experience', 'previous_experience_country', 'work_experience', 
   'previous_experience', 'experience_details', 'skills', 'languages', 
   'salary', 'guarantee', 'status', 'portrait_image_url', 'full_body_image_url', 
-  'passport_number', 'date_of_birth', 'place_of_birth', 'phone', 'mobile', 'raw_data'
+  'passport_number', 'date_of_birth', 'place_of_birth', 'phone', 'mobile', 'raw_data',
+  'photo_import_status', 'photo_import_error', 'photo_imported_at', 'zoho_photo_path', 'zoho_record_id'
 ];
 
 export const useWorkers = () => {
@@ -121,6 +122,15 @@ export const useWorkers = () => {
     const work_experience = raw.WorkExperience || raw.work_experience || [];
     const previous_experience_country = raw.previous_experience_country || (work_experience.length > 0 ? work_experience[0].country : null);
 
+    // Zoho Specifics for Local Importer
+    const zoho_record_id = raw.ID || raw.id || raw.record_id || raw["ID"] || null;
+    const zoho_photo_path = raw.Photo || raw.photo || raw["Photo"] || null;
+    
+    let photo_import_status = 'no_photo';
+    if (zoho_photo_path) {
+      photo_import_status = (raw.portrait_image_url || (typeof raw.Photo === 'string' && raw.Photo.startsWith('http'))) ? 'done' : 'pending';
+    }
+
     return {
       worker_code,
       name,
@@ -144,8 +154,11 @@ export const useWorkers = () => {
       previous_experience_country,
       phone,
       mobile: phone,
-      portrait_image_url: raw.portrait_image_url || null,
+      portrait_image_url: raw.portrait_image_url || (typeof raw.Photo === 'string' && raw.Photo.startsWith('http') ? raw.Photo : null),
       full_body_image_url: raw.full_body_image_url || null,
+      zoho_record_id,
+      zoho_photo_path,
+      photo_import_status,
       raw_data: raw
     };
   };
@@ -196,16 +209,24 @@ export const useWorkers = () => {
         }),
       });
 
-      const result = await response.json();
+      const text = await response.text();
+      let result;
+      
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        console.warn("Zoho API returned non-JSON response:", text);
+        return null;
+      }
 
       if (!response.ok || !result.success) {
-        console.warn("Zoho server import failed:", result.error);
+        console.warn("Zoho server import failed:", result.error || "Unknown error");
         return null;
       }
 
       return result.publicUrl;
     } catch (error) {
-      console.warn("Zoho import API failed:", error);
+      console.warn("Zoho import API call failed:", error);
       return null;
     }
   };

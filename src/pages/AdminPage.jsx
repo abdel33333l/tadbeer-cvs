@@ -241,6 +241,12 @@ const AdminPage = () => {
     return acc;
   }, {});
 
+  const photoStats = workers.reduce((acc, w) => {
+    const status = w.photo_import_status || 'pending';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, { pending: 0, done: 0, failed: 0, no_photo: 0 });
+
   return (
     <div className="min-h-screen bg-surface flex flex-col">
       {/* Header */}
@@ -495,6 +501,32 @@ const AdminPage = () => {
                         <span className="font-black text-primary bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">{count}</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3 tracking-widest uppercase">حالة صور Zoho</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 font-medium">في الانتظار</span>
+                      <span className="font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">{photoStats.pending}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 font-medium">تم الاستيراد</span>
+                      <span className="font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-lg border border-green-100">{photoStats.done}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600 font-medium">فشل الاستيراد</span>
+                      <span className="font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg border border-red-100">{photoStats.failed}</span>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl mt-4 space-y-2">
+                      <p className="text-[10px] font-black text-blue-700 leading-tight">
+                        💡 لاستيراد الصور بجودة عالية، شغّل الأمر التالي على جهاز الماك الخاص بك:
+                      </p>
+                      <code className="block bg-white p-2 rounded border border-blue-200 text-[9px] font-mono text-blue-900 select-all text-left" dir="ltr">
+                        npm run watch:zoho-photos
+                      </code>
+                    </div>
                   </div>
                 </div>
 

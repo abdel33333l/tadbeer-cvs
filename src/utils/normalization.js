@@ -82,78 +82,109 @@ export const getNormalizedSkills = (worker) => {
 };
 
 // Helper to normalize languages from diverse formats
-export const getNormalizedLanguages = (worker) => {
-  if (!worker) return [];
+export const getNormalizedLanguages = (rawWorker) => {
+  if (!rawWorker) return [];
 
-  const containerKeys = [
-    'languages', 'Languages', 'language', 'Language', 'LANGUAGES',
-    'Knowledge Of Language', 'Knowledge of Language', 'KnowledgeOfLanguage', 'knowledge_of_language',
-    'Language SubForm', 'Language_SubForm', 'Language_SubForm.English', 'Languages SubForm', 'Languages_SubForm'
+  const sources = [
+    rawWorker.languages,
+    rawWorker.Languages,
+    rawWorker.language,
+    rawWorker.Language,
+    rawWorker["Languages"],
+    rawWorker["Knowledge Of Language"],
+    rawWorker["Knowledge of Language"],
+    rawWorker["Knowledge_Of_Language"],
+    rawWorker["Knowledge_Of_Language_SubForm"],
+    rawWorker["Knowledge_Of_Language_SubForm.English"],
+    rawWorker["English"],
+    rawWorker.English,
+    rawWorker["Arabic"],
+    rawWorker.Arabic,
+    // Also check raw_data if we are passing a full worker record
+    rawWorker.raw_data?.languages,
+    rawWorker.raw_data?.Languages,
+    rawWorker.raw_data?.["Knowledge_Of_Language_SubForm.English"],
+    rawWorker.raw_data?.["Knowledge Of Language"],
   ];
 
-  let result = [];
+  const result = [];
 
-  // 1. Check container fields (Tables/Arrays/Strings)
-  for (const key of containerKeys) {
-    const val = worker[key] || worker.raw_data?.[key];
-    if (!val) continue;
+  const addLanguage = (value) => {
+    if (!value) return;
 
-    if (typeof val === 'string') {
-      result.push(...val.split(',').map(l => l.trim()));
+    if (typeof value === "string") {
+      const clean = value.trim();
+      if (!clean) return;
+
+      if (clean.includes(",")) {
+        clean.split(",").forEach(addLanguage);
+        return;
+      }
+
+      result.push(clean);
+      return;
     }
-    else if (Array.isArray(val)) {
-      val.forEach(item => {
-        if (typeof item === 'string') result.push(item.trim());
-        else if (typeof item === 'object' && item !== null) {
-          const name = item.English || item.language || item.Language || item.name || item.Arabic || item.Label || Object.values(item)[0];
-          const rate = item.Rate || item.rate || item.Level || item.level || item.Percentage || item.proficiency || item.Value || item.Result;
-          
-          if (name && (rate === undefined || isYes(rate) || (typeof rate === 'number' && rate > 0) || (typeof rate === 'string' && !rate.toUpperCase().includes('NO')))) {
-            result.push(rate && typeof rate !== 'boolean' && !isYes(rate) ? `${name} (${rate}${typeof rate === 'number' ? '%' : ''})` : name);
+
+    if (typeof value === "number") {
+      if (value > 0) result.push("English");
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(addLanguage);
+      return;
+    }
+
+    if (typeof value === "object") {
+      const langName =
+        value.English ||
+        value.english ||
+        value.Language ||
+        value.language ||
+        value.name ||
+        value.Name ||
+        value.Arabic ||
+        value.arabic;
+
+      const rate =
+        value.Rate ||
+        value.rate ||
+        value.Percentage ||
+        value.percentage ||
+        value.Level ||
+        value.level;
+
+      const resultValue =
+        value.Result ||
+        value.result ||
+        value.Value ||
+        value.value;
+
+      if (langName) {
+        if (
+          !resultValue ||
+          String(resultValue).toLowerCase() === "yes" ||
+          String(resultValue).toLowerCase() === "true" ||
+          Number(rate) > 0
+        ) {
+          result.push(String(langName).trim());
+        }
+      } else {
+        Object.entries(value).forEach(([key, val]) => {
+          if (
+            val === true ||
+            String(val).toLowerCase() === "yes" ||
+            String(val).toLowerCase() === "true" ||
+            Number(val) > 0
+          ) {
+            result.push(key);
           }
-        }
-      });
-    }
-    else if (typeof val === 'object') {
-      Object.entries(val).forEach(([k, v]) => {
-        if (v && v !== 'NO' && v !== 'No' && v !== '0' && v !== false) {
-          result.push(typeof v === 'string' && !isYes(v) ? `${k} (${v})` : k);
-        }
-      });
-    }
-  }
-
-  // 2. Check individual flat fields (English, Arabic, etc.)
-  const individualLangs = {
-    'English': ['English', 'english', 'ENGLISH', 'الإنجليزية', 'انجليزي'],
-    'Arabic': ['Arabic', 'arabic', 'ARABIC', 'العربية', 'عربي'],
-    'French': ['French', 'french', 'الفرنسية'],
-    'Hindi': ['Hindi', 'hindi', 'الهندية'],
-    'Tagalog': ['Tagalog', 'tagalog'],
-    'Spanish': ['Spanish', 'spanish', 'الإسبانية']
-  };
-
-  Object.entries(individualLangs).forEach(([label, keys]) => {
-    for (const key of keys) {
-      const val = worker[key] || worker.raw_data?.[key];
-      if (val !== undefined && val !== null) {
-        // If it's a number > 0, or a "YES" string, or a boolean true
-        if ((typeof val === 'number' && val > 0) || isYes(val)) {
-          result.push(label);
-          break;
-        }
-        // If it's a non-empty string that doesn't say "NO"
-        if (typeof val === 'string' && val.length > 0 && !['NO', 'FALSE', '0', 'EMPTY', 'NONE'].includes(val.toUpperCase().trim())) {
-          result.push(label);
-          break;
-        }
+        });
       }
     }
-  });
+  };
 
-  // 3. Specific Arabic Keys
-  if (isYes(worker['الإنجليزية'] || worker.raw_data?.['الإنجليزية'] || worker['الانجليزية'] || worker.raw_data?.['الانجليزية'])) result.push('English');
-  if (isYes(worker['العربية'] || worker.raw_data?.['العربية'])) result.push('Arabic');
+  sources.forEach(addLanguage);
 
   return [...new Set(result.filter(Boolean))];
 };

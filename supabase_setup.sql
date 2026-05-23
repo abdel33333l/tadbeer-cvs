@@ -25,6 +25,11 @@ create table if not exists public.workers (
   place_of_birth text,
   phone text,
   mobile text,
+  photo_import_status text default 'pending',
+  photo_import_error text,
+  photo_imported_at timestamptz,
+  zoho_photo_path text,
+  zoho_record_id text,
   raw_data jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

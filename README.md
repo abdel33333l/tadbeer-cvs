@@ -85,6 +85,41 @@ create policy "Public can delete workers" on workers for delete using (true);
     - `SELECT`: `true`
     - `INSERT/UPDATE/DELETE`: `true` (Or restricted to authenticated if you add auth later).
 
+## Zoho Photo Importer (High-Quality)
+
+The app includes a local script to import high-resolution portraits from Zoho Creator using your browser cookies (bypassing CORS).
+
+### 1. Database Setup
+Run this SQL in Supabase to add tracking columns:
+```sql
+alter table public.workers
+add column if not exists photo_import_status text default 'pending',
+add column if not exists photo_import_error text,
+add column if not exists photo_imported_at timestamptz,
+add column if not exists zoho_photo_path text,
+add column if not exists zoho_record_id text;
+```
+
+### 2. Local Environment Setup
+Create a file named `.env.local` in the project root on your Mac:
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-secret-key
+ZOHO_COOKIE=your-full-cookie-string
+ZOHO_CREATOR_BASE_URL=https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers
+WATCH_INTERVAL_SECONDS=30
+```
+
+### 3. Run the Importer
+- **One-time import**:
+  ```bash
+  npm run import:zoho-photos
+  ```
+- **Watch mode** (automatically imports new uploads):
+  ```bash
+  npm run watch:zoho-photos
+  ```
+
 ## Vercel Deployment (Production)
 
 The app is ready for deployment on Vercel as a static site.
