@@ -45,13 +45,14 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
   if (!isOpen || !worker) return null;
 
   const profileImage = 
+    worker.full_body_image_url || 
     worker.fullBodyImage || 
-    worker.body_image || 
     worker.Full_Image || 
+    worker.portrait_image_url ||
     worker.portraitImage ||
     worker.Photo;
 
-  const isPortraitFallback = !worker.fullBodyImage && !worker.body_image && !worker.Full_Image && (worker.portraitImage || worker.Photo);
+  const isPortraitFallback = !worker.full_body_image_url && !worker.fullBodyImage && !worker.Full_Image && (worker.portrait_image_url || worker.portraitImage || worker.Photo);
 
   // Use UI helpers with exhaustive fallbacks
   const skills = getWorkerSkills(worker);

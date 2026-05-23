@@ -237,3 +237,103 @@ export const getWorkerPhone = (worker) => {
 
   return normalizePhoneNumber(rawPhone);
 };
+
+/**
+ * Zoho Image Detection Helpers
+ */
+
+function getZohoPhotoPath(rawWorker) {
+  return (
+    rawWorker.Photo ||
+    rawWorker.photo ||
+    rawWorker["Photo"] ||
+    rawWorker["Profile Photo"] ||
+    rawWorker["profile_photo"] ||
+    rawWorker["Worker Photo"] ||
+    rawWorker["worker_photo"] ||
+    rawWorker.Image ||
+    rawWorker.image ||
+    ""
+  );
+}
+
+export function findPossibleImagePath(rawWorker) {
+  const direct = getZohoPhotoPath(rawWorker);
+  if (direct) return direct;
+
+  for (const value of Object.values(rawWorker)) {
+    if (
+      typeof value === "string" &&
+      (
+        value.includes("/image/") ||
+        value.includes("download-file") ||
+        value.match(/\.(png|jpg|jpeg|webp)(\?|$)/i)
+      )
+    ) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function buildZohoImageUrl(rawWorker) {
+  const photoPath = findPossibleImagePath(rawWorker);
+  if (!photoPath) return "";
+
+  // If already full URL, return it
+  if (photoPath.startsWith("http://") || photoPath.startsWith("https://")) {
+    return photoPath;
+  }
+
+  const baseUrl = import.meta.env.VITE_ZOHO_CREATOR_BASE_URL;
+
+  if (!baseUrl) {
+    console.warn("Missing VITE_ZOHO_CREATOR_BASE_URL");
+    return "";
+  }
+
+  // Normalize slashes
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const cleanPath = photoPath.startsWith("/") ? photoPath : `/${photoPath}`;
+
+  return `${cleanBase}${cleanPath}`;
+}
+
+function buildZohoDownloadFileUrl(rawWorker) {
+  const photoPath = findPossibleImagePath(rawWorker);
+  if (!photoPath) return "";
+
+  const baseUrl = import.meta.env.VITE_ZOHO_CREATOR_BASE_URL;
+  if (!baseUrl) return "";
+
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+
+  const fileName = photoPath.split("/").pop();
+  if (!fileName) return "";
+
+  const recordId =
+    rawWorker.ID ||
+    rawWorker.id ||
+    rawWorker.record_id ||
+    rawWorker.recordId ||
+    rawWorker["Record ID"] ||
+    rawWorker["ID"] ||
+    rawWorker["Zoho ID"];
+
+  if (!recordId) return "";
+
+  return `${cleanBase}/${recordId}/Photo/download-file?filepath=/${encodeURIComponent(fileName)}`;
+}
+
+export function getZohoImageUrlCandidates(rawWorker) {
+  const candidates = [];
+
+  const directOrRelative = buildZohoImageUrl(rawWorker);
+  if (directOrRelative) candidates.push(directOrRelative);
+
+  const downloadFile = buildZohoDownloadFileUrl(rawWorker);
+  if (downloadFile) candidates.push(downloadFile);
+
+  return [...new Set(candidates)];
+}

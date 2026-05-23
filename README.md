@@ -104,6 +104,7 @@ In the Vercel project settings, add the following Environment Variables (found i
 - `VITE_OFFICE_NAME`: Agency branding name.
 - `VITE_OFFICE_LOCATION`: Office location/number.
 - `VITE_OFFICE_MANAGER`: Manager's name.
+- `VITE_ZOHO_CREATOR_BASE_URL`: Base URL for Zoho Creator reports (e.g. `https://creatorapp.zoho.com/eitmam/eitmam-erp/report/All_Workers`).
 - `VITE_SUPABASE_URL`: Your Supabase Project URL.
 - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon Key.
 

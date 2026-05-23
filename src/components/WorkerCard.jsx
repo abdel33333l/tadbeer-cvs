@@ -6,7 +6,7 @@ const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
   const experienceLabel = worker.Experience === 'Experienced' ? 'خبيرة' : 'مبتدئة';
   const experienceColor = worker.Experience === 'Experienced' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800';
 
-  // Specific image logic for the card - prioritize Supabase public URLs
+  // Specific image logic for the card - prioritize Supabase high-quality URLs
   const cardImage = 
     worker.portrait_image_url || 
     worker.portraitImage || 

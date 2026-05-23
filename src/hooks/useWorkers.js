@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parsePdfForWorkerData, normalizePassport } from '../utils/pdfParser';
-import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone } from '../utils/normalization';
+import { getNormalizedSkills, getNormalizedLanguages, getWorkerPhone, getZohoImageUrlCandidates, findPossibleImagePath } from '../utils/normalization';
 import { get, set, del } from 'idb-keyval';
 
 const WORKERS_KEY = 'tadbeer_workers_v3';
@@ -144,8 +144,8 @@ export const useWorkers = () => {
       previous_experience_country,
       phone,
       mobile: phone,
-      portrait_image_url: raw.portraitImage || raw.Photo || raw.portrait_image_url || null,
-      full_body_image_url: raw.fullBodyImage || raw.Full_Image || raw.full_body_image_url || null,
+      portrait_image_url: raw.portrait_image_url || null,
+      full_body_image_url: raw.full_body_image_url || null,
       raw_data: raw
     };
   };
@@ -162,7 +162,7 @@ export const useWorkers = () => {
         .upload(fileName, blob, {
           contentType: 'image/jpeg',
           upsert: true,
-          cacheControl: '3600'
+          cacheControl: '31536000'
         });
 
       if (uploadError) throw uploadError;
@@ -178,25 +178,89 @@ export const useWorkers = () => {
     }
   };
 
+  const uploadImageFromUrlToSupabase = async (imageUrl, workerCode, type = "portrait") => {
+    try {
+      const response = await fetch(imageUrl, {
+        method: "GET",
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Zoho image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+
+      if (!blob.type.startsWith("image/")) {
+        throw new Error(`Zoho URL did not return an image. Content-Type: ${blob.type}`);
+      }
+
+      const extension =
+        blob.type.includes("png") ? "png" :
+        blob.type.includes("webp") ? "webp" :
+        "jpg";
+
+      const safeWorkerCode = String(workerCode || "unknown").replace(/[^a-zA-Z0-9_-]/g, "");
+      const filePath = `${safeWorkerCode}/${type}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("worker-images")
+        .upload(filePath, blob, {
+          contentType: blob.type,
+          cacheControl: "31536000",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("worker-images")
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (err) {
+      console.warn(`Zoho image candidate fetch/upload failed: ${imageUrl}`, err);
+      return null;
+    }
+  };
+
+  const importZohoPortrait = async (rawWorker, workerCode) => {
+    const candidates = getZohoImageUrlCandidates(rawWorker);
+    if (candidates.length === 0) return null;
+
+    for (const url of candidates) {
+      const publicUrl = await uploadImageFromUrlToSupabase(url, workerCode, "portrait");
+      if (publicUrl) return publicUrl;
+    }
+
+    return null;
+  };
+
   const addWorker = async (worker, shouldRefresh = true) => {
     try {
       const normalized = normalizeWorker(worker);
       
-      // 1. Handle Images if they are Data URLs
-      if (normalized.portrait_image_url && normalized.portrait_image_url.startsWith('data:')) {
-        normalized.portrait_image_url = await uploadWorkerImage(normalized.portrait_image_url, 'portrait', normalized.worker_code);
-      }
-      if (normalized.full_body_image_url && normalized.full_body_image_url.startsWith('data:')) {
-        normalized.full_body_image_url = await uploadWorkerImage(normalized.full_body_image_url, 'fullbody', normalized.worker_code);
+      // 1. Try importing Zoho high-quality photo first
+      const zohoPortraitUrl = await importZohoPortrait(worker, normalized.worker_code);
+      if (zohoPortraitUrl) {
+        normalized.portrait_image_url = zohoPortraitUrl;
       }
 
-      // 2. Ensure only valid columns are sent
+      // 2. Handle fallback PDF Images if they are Data URLs and Zoho failed
+      if (!normalized.portrait_image_url && worker.portraitImage && worker.portraitImage.startsWith('data:')) {
+        normalized.portrait_image_url = await uploadWorkerImage(worker.portraitImage, 'portrait', normalized.worker_code);
+      }
+      if (worker.fullBodyImage && worker.fullBodyImage.startsWith('data:')) {
+        normalized.full_body_image_url = await uploadWorkerImage(worker.fullBodyImage, 'fullbody', normalized.worker_code);
+      }
+
+      // 3. Ensure only valid columns are sent
       const record = {};
       VALID_COLUMNS.forEach(col => {
         if (normalized[col] !== undefined) record[col] = normalized[col];
       });
 
-      // 3. Upsert into Supabase
+      // 4. Upsert into Supabase
       const { data, error } = await supabase
         .from('workers')
         .upsert(record, { onConflict: 'worker_code' })
@@ -272,16 +336,6 @@ export const useWorkers = () => {
           .neq('id', '00000000-0000-0000-0000-000000000000');
         
         if (delError) throw new Error("فشل حذف البيانات القديمة");
-        
-        // Storage cleanup attempt
-        try {
-          const { data: files } = await supabase.storage.from('worker-images').list();
-          if (files && files.length > 0) {
-             // Supabase storage delete is complex for nested folders, skipping for safety 
-             // unless we specifically list all worker folders. 
-             // Just warn if needed or implement recursion.
-          }
-        } catch (e) { console.warn("Storage cleanup skipped", e); }
       }
 
       // STEP 4: PDF Processing (Optional)
@@ -318,17 +372,12 @@ export const useWorkers = () => {
             rawWorker.WorkExperience = matchingPage.experience;
             rawWorker.portraitImage = matchingPage.profileImage;
             rawWorker.fullBodyImage = matchingPage.fullBodyImage;
-            if (matchingPage.profileImage) imgCount++;
           }
         }
 
         try {
-          const normalized = normalizeWorker(rawWorker);
-          // Temporary console debug for language verification
-          if (import.meta.env.DEV) {
-             console.log(`Normalized languages for ${normalized.worker_code}:`, normalized.languages);
-          }
-          await addWorker(rawWorker, false);
+          const res = await addWorker(rawWorker, false);
+          if (res && res.portrait_image_url) imgCount++;
           successCount++;
         } catch (e) {
           console.error(`Failed at worker ${i}:`, e);
