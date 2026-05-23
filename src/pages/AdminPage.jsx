@@ -48,6 +48,18 @@ const AdminPage = () => {
     navigate('/');
   };
 
+  const handleDeleteWorker = async (id) => {
+    if (window.confirm('هل أنت متأكد من حذف هذه العاملة؟')) {
+      try {
+        await deleteWorker(id);
+        setUploadStatus({ success: true, message: 'تم حذف العاملة بنجاح' });
+        setTimeout(() => setUploadStatus(null), 3000);
+      } catch (err) {
+        setUploadStatus({ success: false, message: 'فشل حذف العاملة' });
+      }
+    }
+  };
+
   const handleUpload = async () => {
     if (!jsonFile) {
       setUploadStatus({ success: false, message: 'يرجى اختيار ملف JSON أولاً' });
@@ -206,6 +218,56 @@ const AdminPage = () => {
                 >
                   {isUploading ? 'جاري المعالجة...' : 'بدء عملية الرفع والمعالجة'}
                 </button>
+              </div>
+            </section>
+
+            {/* Worker List Section */}
+            <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-lg font-bold text-primary">إدارة العاملات ({workers.length})</h2>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-sm">
+                  <thead className="bg-gray-50 text-gray-400 font-bold border-b border-gray-100">
+                    <tr>
+                      <th className="p-4">الاسم</th>
+                      <th className="p-4">الرقم</th>
+                      <th className="p-4">الجنسية</th>
+                      <th className="p-4">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {workers.map(worker => (
+                      <tr key={worker.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-4 font-bold text-primary">{worker.Worker_Name}</td>
+                        <td className="p-4 text-gray-500 font-mono">{worker.Worker_No}</td>
+                        <td className="p-4 text-gray-500">{worker.Nationality}</td>
+                        <td className="p-4">
+                          <button 
+                            onClick={() => handleDeleteWorker(worker.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {workers.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="p-12 text-center text-gray-400 font-bold italic">
+                          لا توجد بيانات حالياً
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </section>
 

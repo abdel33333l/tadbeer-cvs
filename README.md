@@ -32,6 +32,57 @@ A mobile-first worker listing application designed for agency customers to brows
     npm run dev
     ```
 
+## Supabase Setup (Production Database)
+
+The app uses Supabase for storing worker data and images.
+
+### 1. Create Supabase Project
+1.  Sign up at [Supabase](https://supabase.com).
+2.  Create a new project.
+
+### 2. Create Workers Table
+Run the following SQL in the Supabase SQL Editor:
+```sql
+create table workers (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  worker_code text unique,
+  name text,
+  nationality text,
+  age integer,
+  religion text,
+  marital_status text,
+  experience text,
+  skills jsonb default '[]'::jsonb,
+  languages jsonb default '[]'::jsonb,
+  portrait_image_url text,
+  full_body_image_url text,
+  work_experience jsonb default '[]'::jsonb,
+  passport_number text,
+  date_of_birth text,
+  place_of_birth text,
+  raw_data jsonb
+);
+
+-- Enable RLS
+alter table workers enable row level security;
+
+-- Create Policies
+create policy "Public can read workers" on workers for select using (true);
+create policy "Public can insert workers" on workers for insert with check (true);
+create policy "Public can update workers" on workers for update using (true);
+create policy "Public can delete workers" on workers for delete using (true);
+```
+
+### 3. Create Storage Bucket
+1.  Go to **Storage** in Supabase.
+2.  Create a new bucket named `worker-images`.
+3.  Set it to **Public**.
+4.  Add a policy to allow public access:
+    - `SELECT`: `true`
+    - `INSERT/UPDATE/DELETE`: `true` (Or restricted to authenticated if you add auth later).
+
 ## Vercel Deployment (Production)
 
 The app is ready for deployment on Vercel as a static site.
@@ -51,6 +102,8 @@ In the Vercel project settings, add the following Environment Variables (found i
 - `VITE_OFFICE_NAME`: Agency branding name.
 - `VITE_OFFICE_LOCATION`: Office location/number.
 - `VITE_OFFICE_MANAGER`: Manager's name.
+- `VITE_SUPABASE_URL`: Your Supabase Project URL.
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase Anon Key.
 
 ### 4. Build Settings
 - **Framework Preset**: Vite
