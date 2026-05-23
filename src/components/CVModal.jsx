@@ -437,4 +437,11 @@ const InfoRow = ({ icon, label, value }) => (
   </div>
 );
 
+const PrintItem = ({ label, value }) => (
+  <div className="flex flex-col">
+    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter leading-none mb-1">{label}</span>
+    <span className="text-sm font-black text-primary leading-tight">{value || '—'}</span>
+  </div>
+);
+
 export default CVModal;
