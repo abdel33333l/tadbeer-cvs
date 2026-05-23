@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
-import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon } from 'lucide-react';
+import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon, Loader2 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'tadbeer2024';
@@ -13,6 +13,7 @@ const AdminPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [currentProgress, setCurrentProgress] = useState('');
   const [jsonFile, setJsonFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -29,7 +30,7 @@ const AdminPage = () => {
     }
   }, [whatsappNumber, tempWhatsapp]);
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>;
+  if (isLoading && workers.length === 0) return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>;
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -67,22 +68,35 @@ const AdminPage = () => {
     }
 
     setIsUploading(true);
+    setCurrentProgress('بدء المعالجة...');
+    setUploadStatus(null);
+
     try {
-      const result = await uploadData(jsonFile, pdfFile);
+      const result = await uploadData(jsonFile, pdfFile, (progress) => {
+        setCurrentProgress(progress);
+      });
+      
       setUploadStatus({ 
         success: true, 
         message: (
           <div className="flex flex-col gap-1 text-right">
-            <span>✓ تم رفع {result.total} عاملة</span>
-            <span>✓ تم استخراج بيانات الخبرة لـ {result.expMatched} عاملة</span>
-            <span className="text-amber-600">⚠ {result.noExp} عاملة بدون بيانات خبرة</span>
+            <span className="text-lg font-black">✓ اكتملت العملية بنجاح</span>
+            <span className="text-sm">إجمالي العاملات: {result.total}</span>
+            <span className="text-sm text-green-600 font-bold">تم الرفع بنجاح: {result.success}</span>
+            {result.failed > 0 && <span className="text-sm text-red-600 font-bold">فشل رفع: {result.failed}</span>}
           </div>
         )
       });
       setJsonFile(null);
       setPdfFile(null);
+      setCurrentProgress('');
     } catch (err) {
-      setUploadStatus({ success: false, message: 'فشل رفع الملفات. يرجى التأكد من التنسيق الصحيح.' });
+      console.error('Upload catch block:', err);
+      setUploadStatus({ 
+        success: false, 
+        message: `فشل العملية: ${err.message || 'خطأ غير معروف'}. يرجى التحقق من الكونسول للمزيد من التفاصيل.` 
+      });
+      setCurrentProgress('');
     } finally {
       setIsUploading(false);
     }
@@ -214,10 +228,18 @@ const AdminPage = () => {
                 <button 
                   onClick={handleUpload}
                   disabled={!jsonFile || isUploading}
-                  className={`w-full py-3 rounded-lg font-bold text-white transition-all flex items-center justify-center gap-2 ${!jsonFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-accent hover:bg-opacity-90'}`}
+                  className={`w-full py-4 rounded-xl font-black text-white transition-all flex items-center justify-center gap-2 ${!jsonFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-accent hover:bg-opacity-90 shadow-xl shadow-accent/20'}`}
                 >
+                  {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
                   {isUploading ? 'جاري المعالجة...' : 'بدء عملية الرفع والمعالجة'}
                 </button>
+
+                {isUploading && currentProgress && (
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center gap-3 animate-pulse">
+                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
+                    <p className="text-sm font-bold text-blue-700">{currentProgress}</p>
+                  </div>
+                )}
               </div>
             </section>
 

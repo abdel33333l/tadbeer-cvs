@@ -13,10 +13,20 @@ const dataUrlToBlob = async (dataUrl) => {
   return await res.blob();
 };
 
+// Supported Supabase columns
+const VALID_COLUMNS = [
+  'worker_code', 'name', 'nationality', 'age', 'religion', 
+  'marital_status', 'experience', 'skills', 'languages', 
+  'portrait_image_url', 'full_body_image_url', 'work_experience', 
+  'previous_experience_country', 'passport_number', 'date_of_birth', 
+  'place_of_birth', 'raw_data'
+];
+
 export const useWorkers = () => {
   const [workers, setWorkers] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState(DEFAULT_WHATSAPP);
   const [isLoading, setIsLoading] = useState(true);
+  const [uploadProgress, setUploadStatus] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -25,11 +35,9 @@ export const useWorkers = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // 1. Load WhatsApp from localStorage (keep it local for agency preferences)
       const savedWhatsapp = localStorage.getItem(WHATSAPP_KEY);
       if (savedWhatsapp) setWhatsappNumber(savedWhatsapp);
 
-      // 2. Fetch Workers from Supabase
       const { data, error } = await supabase
         .from('workers')
         .select('*')
@@ -38,10 +46,10 @@ export const useWorkers = () => {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // Map Supabase fields to app fields
         const mappedWorkers = data.map(w => ({
           ...w.raw_data,
           id: w.id,
+          worker_id_db: w.id, // Internal DB ID
           portraitImage: w.portrait_image_url,
           fullBodyImage: w.full_body_image_url,
           Photo: w.portrait_image_url,
@@ -52,7 +60,6 @@ export const useWorkers = () => {
         }));
         setWorkers(mappedWorkers);
       } else {
-        // 3. Try Migration if Supabase is empty
         await runMigration();
       }
     } catch (err) {
@@ -70,17 +77,68 @@ export const useWorkers = () => {
       const localWorkers = await get(WORKERS_KEY);
       if (localWorkers && localWorkers.length > 0) {
         console.log('Starting migration to Supabase...');
-        
         for (const worker of localWorkers) {
-          await addWorker(worker, false); // Add without refreshing the whole list each time
+          await addWorker(worker, false);
         }
-        
         localStorage.setItem('supabase_migration_done', 'true');
-        fetchData(); // Refresh list after migration
+        fetchData();
       }
     } catch (err) {
       console.warn('Migration failed', err);
     }
+  };
+
+  const normalizeWorker = (raw) => {
+    // 1. Map fields flexibly
+    const name = raw.name || raw.Name || raw.fullName || raw["Worker Name"] || raw["Worker_Name"] || "N/A";
+    const worker_code = raw.worker_code || raw.code || raw.ref || raw.id || raw["Ref No"] || raw["Worker No"] || raw["Worker_No"] || `W-${Math.random().toString(36).substr(2, 9)}`;
+    const nationality = raw.nationality || raw.country || raw.Nationality || raw["Nationality"] || "N/A";
+    const religion = raw.religion || raw.Religion || raw["Religion"] || "N/A";
+    const age = parseInt(raw.age || raw.Age || raw["Age"]) || null;
+    const marital_status = raw.marital_status || raw.maritalStatus || raw["Marital Status"] || raw["Marital_Status"] || "N/A";
+    const experience = raw.experience || raw.Experience || raw["Experience"] || "Beginner";
+    const passport_number = raw.passport_number || raw.passportNo || raw["Passport No"] || raw["Passport_Number"] || "";
+    const date_of_birth = raw.date_of_birth || raw.dob || raw["Date of Birth"] || raw["Date_Of_Birth"] || "";
+    const place_of_birth = raw.place_of_birth || raw.pob || raw["Place of Birth"] || raw["Place_Of_Birth"] || "";
+
+    // 2. Map skills and languages
+    let skills = raw.skills || raw.Skills || raw["Skills"] || [];
+    if (typeof skills === 'string') skills = skills.split(',').map(s => s.trim());
+    else if (!Array.isArray(skills)) {
+      // Check for specific SubForm keys from Zoho/Common exports
+      const subFormSkills = raw["Skills_SubForm.English"] || raw["Skills_SubForm"];
+      if (subFormSkills) skills = subFormSkills.split(',').map(s => s.trim());
+    }
+
+    let languages = raw.languages || raw.Languages || raw["Languages"] || [];
+    if (typeof languages === 'string') languages = languages.split(',').map(l => l.trim());
+    else if (!Array.isArray(languages)) {
+      const subFormLangs = raw["Knowledge_Of_Language_SubForm.English"] || raw["Knowledge_Of_Language_SubForm"];
+      if (subFormLangs) languages = subFormLangs.split(',').map(l => l.trim());
+    }
+
+    const work_experience = raw.WorkExperience || raw.work_experience || [];
+    const previous_experience_country = raw.previous_experience_country || (work_experience.length > 0 ? work_experience[0].country : null);
+
+    return {
+      worker_code,
+      name,
+      nationality,
+      age,
+      religion,
+      marital_status,
+      experience,
+      skills,
+      languages,
+      passport_number,
+      date_of_birth,
+      place_of_birth,
+      work_experience,
+      previous_experience_country,
+      portrait_image_url: raw.portraitImage || raw.Photo || null,
+      full_body_image_url: raw.fullBodyImage || raw.Full_Image || null,
+      raw_data: raw
+    };
   };
 
   const uploadWorkerImage = async (dataUrl, type, workerNo) => {
@@ -105,118 +163,132 @@ export const useWorkers = () => {
 
       return data.publicUrl;
     } catch (err) {
-      console.error('Image upload failed:', err);
+      console.error(`Image upload failed for ${workerNo} (${type}):`, err);
       return null;
     }
   };
 
   const addWorker = async (worker, shouldRefresh = true) => {
     try {
+      const normalized = normalizeWorker(worker);
+      
       // 1. Handle Images if they are Data URLs
-      let portraitUrl = worker.portraitImage;
-      let fullBodyUrl = worker.fullBodyImage;
-
-      if (portraitUrl && portraitUrl.startsWith('data:')) {
-        portraitUrl = await uploadWorkerImage(portraitUrl, 'portrait', worker.Worker_No);
+      if (normalized.portrait_image_url && normalized.portrait_image_url.startsWith('data:')) {
+        normalized.portrait_image_url = await uploadWorkerImage(normalized.portrait_image_url, 'portrait', normalized.worker_code);
       }
-      if (fullBodyUrl && fullBodyUrl.startsWith('data:')) {
-        fullBodyUrl = await uploadWorkerImage(fullBodyUrl, 'fullbody', worker.Worker_No);
+      if (normalized.full_body_image_url && normalized.full_body_image_url.startsWith('data:')) {
+        normalized.full_body_image_url = await uploadWorkerImage(normalized.full_body_image_url, 'fullbody', normalized.worker_code);
       }
 
-      // 2. Prepare Supabase record
-      const record = {
-        worker_code: worker.Worker_No,
-        name: worker.Worker_Name,
-        nationality: worker.Nationality,
-        age: parseInt(worker.Age) || null,
-        religion: worker.Religion,
-        marital_status: worker.Marital_Status,
-        experience: worker.Experience,
-        skills: worker.Skills || [],
-        languages: worker.Languages || [],
-        portrait_image_url: portraitUrl,
-        full_body_image_url: fullBodyUrl,
-        work_experience: worker.WorkExperience || [],
-        passport_number: worker.Passport_Number,
-        date_of_birth: worker.Date_Of_Birth,
-        place_of_birth: worker.Place_Of_Birth,
-        raw_data: worker // Keep original fields for safety
-      };
+      // 2. Ensure only valid columns are sent
+      const record = {};
+      VALID_COLUMNS.forEach(col => {
+        if (normalized[col] !== undefined) record[col] = normalized[col];
+      });
 
+      // 3. Upsert into Supabase
       const { data, error } = await supabase
         .from('workers')
-        .insert([record])
+        .upsert(record, { onConflict: 'worker_code' })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Supabase Upsert Error for ${normalized.worker_code}:`, error);
+        throw error;
+      }
       
       if (shouldRefresh) await fetchData();
       return data;
     } catch (err) {
-      console.error('Failed to add worker:', err);
+      console.error('Failed to add/upsert worker:', err);
       throw err;
     }
   };
 
-  const uploadData = async (jsonFile, pdfFile = null) => {
+  const uploadData = async (jsonFile, pdfFile = null, onProgress) => {
     setIsLoading(true);
     try {
-      const jsonText = await jsonFile.text();
-      const jsonData = JSON.parse(jsonText);
-      
-      if (!jsonData || !jsonData.All_Workers) {
-        throw new Error('Invalid JSON format');
+      // STEP 1: JSON Reading
+      onProgress?.('جاري قراءة ملف JSON...');
+      let jsonData;
+      try {
+        const jsonText = await jsonFile.text();
+        jsonData = JSON.parse(jsonText);
+      } catch (e) {
+        console.error('JSON Parse Error:', e);
+        throw new Error('تنسيق ملف JSON غير صحيح');
       }
 
-      let processedWorkers = jsonData.All_Workers.map(worker => ({
-        ...worker,
-        Skills: worker["Skills_SubForm.English"] ? worker["Skills_SubForm.English"].split(',').map(s => s.trim()) : [],
-        Languages: worker["Knowledge_Of_Language_SubForm.English"] ? worker["Knowledge_Of_Language_SubForm.English"].split(',').map(l => l.trim()) : [],
-        WorkExperience: []
-      }));
+      // STEP 2: Flexible Structure Detection
+      let workersArray = [];
+      if (Array.isArray(jsonData)) workersArray = jsonData;
+      else if (jsonData.All_Workers && Array.isArray(jsonData.All_Workers)) workersArray = jsonData.All_Workers;
+      else if (jsonData.workers && Array.isArray(jsonData.workers)) workersArray = jsonData.workers;
+      else if (jsonData.data && Array.isArray(jsonData.data)) workersArray = jsonData.data;
+      else if (jsonData.results && Array.isArray(jsonData.results)) workersArray = jsonData.results;
+      else throw new Error("تنسيق ملف JSON غير مدعوم");
 
-      let expMatchedCount = 0;
+      onProgress?.(`تم العثور على ${workersArray.length} عاملة. جاري معالجة البيانات...`);
 
+      // STEP 3: PDF Processing (Optional)
+      let pdfPages = [];
       if (pdfFile) {
-        const pdfPages = await parsePdfForWorkerData(pdfFile);
-        processedWorkers = processedWorkers.map(worker => {
-          const workerPassport = normalizePassport(worker.Passport_Number);
-          const workerNo = (worker.Worker_No || '').toUpperCase().replace(/\s+/g, '');
+        onProgress?.('جاري استخراج البيانات من ملف PDF...');
+        try {
+          pdfPages = await parsePdfForWorkerData(pdfFile);
+          onProgress?.(`تمت معالجة ${pdfPages.length} صفحة من ملف PDF.`);
+        } catch (e) {
+          console.warn('PDF processing failed, skipping PDF data:', e);
+          onProgress?.('تنبيه: فشل استخراج بيانات PDF، سيتم رفع بيانات JSON فقط.');
+        }
+      }
+
+      // STEP 4: Merge & Upload
+      let successCount = 0;
+      let imgWarning = false;
+
+      for (let i = 0; i < workersArray.length; i++) {
+        const rawWorker = workersArray[i];
+        onProgress?.(`جاري رفع العاملة ${i + 1} من ${workersArray.length}...`);
+
+        // Match with PDF data if available
+        if (pdfPages.length > 0) {
+          const passport = (rawWorker.Passport_Number || rawWorker.passport_number || "").toUpperCase().replace(/\s+/g, '');
+          const workerNo = (rawWorker.Worker_No || rawWorker.worker_code || "").toUpperCase().replace(/\s+/g, '');
+          
           const matchingPage = pdfPages.find(p => {
             const normalizedPdfText = (p.rawText || '').replace(/\s+/g, '').toUpperCase();
-            return (workerPassport && normalizedPdfText.includes(workerPassport)) || 
+            return (passport && normalizedPdfText.includes(passport)) || 
                    (workerNo && normalizedPdfText.includes(workerNo)) || 
-                   p.passport === workerPassport;
+                   p.passport === passport;
           });
-          
-          if (matchingPage) {
-            if (matchingPage.experience.length > 0) {
-              expMatchedCount++;
-              worker.WorkExperience = matchingPage.experience;
-            }
-            worker.portraitImage = matchingPage.profileImage;
-            worker.fullBodyImage = matchingPage.fullBodyImage;
-          }
-          return worker;
-        });
-      }
 
-      // Batch insert into Supabase
-      // Note: For large datasets, we should do this in chunks
-      for (const worker of processedWorkers) {
-        await addWorker(worker, false);
+          if (matchingPage) {
+            rawWorker.WorkExperience = matchingPage.experience;
+            rawWorker.portraitImage = matchingPage.profileImage;
+            rawWorker.fullBodyImage = matchingPage.fullBodyImage;
+          }
+        }
+
+        try {
+          await addWorker(rawWorker, false);
+          successCount++;
+        } catch (e) {
+          console.error(`Failed to upload worker ${i}:`, e);
+        }
       }
 
       await fetchData();
+      onProgress?.('تم الرفع بنجاح!');
       
       return {
-        total: processedWorkers.length,
-        expMatched: expMatchedCount,
-        noExp: processedWorkers.length - expMatchedCount
+        total: workersArray.length,
+        success: successCount,
+        failed: workersArray.length - successCount
       };
     } catch (err) {
-      console.error('Upload failed:', err);
+      console.error('Final Upload Process Error:', err);
       throw err;
     } finally {
       setIsLoading(false);
@@ -231,7 +303,7 @@ export const useWorkers = () => {
         .eq('id', id);
 
       if (error) throw error;
-      setWorkers(prev => prev.filter(w => w.id !== id));
+      setWorkers(prev => prev.filter(w => w.worker_id_db !== id));
     } catch (err) {
       console.error('Delete failed:', err);
       throw err;
@@ -245,15 +317,12 @@ export const useWorkers = () => {
 
   const clearAllData = async () => {
     try {
-      // 1. Clear Supabase
       const { error } = await supabase
         .from('workers')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (error) throw error;
-
-      // 2. Clear local
       await del(WORKERS_KEY);
       setWorkers([]);
     } catch (err) {
@@ -262,5 +331,5 @@ export const useWorkers = () => {
     }
   };
 
-  return { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData, deleteWorker, addWorker };
+  return { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData, deleteWorker, addWorker, uploadProgress };
 };
