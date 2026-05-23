@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, User, MapPin, Calendar, BookOpen, ShieldCheck } from 'lucide-react';
+import { Heart, User as UserIcon, MapPin, Calendar, BookOpen, ShieldCheck } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 
 const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
@@ -31,7 +31,7 @@ const WorkerCard = ({ worker, isShortlisted, onToggleShortlist, onOpenCV }) => {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
-            <User className="w-20 h-20" />
+            <UserIcon className="w-20 h-20" />
           </div>
         )}
         

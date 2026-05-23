@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User as UserIcon, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 import { buildWhatsAppUrl, buildOfficeWhatsAppUrl } from '../utils/whatsapp';
 
@@ -118,7 +118,7 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                     </>
                   ) : (
                     <div className="w-full aspect-[3/4] flex items-center justify-center bg-gray-100 text-gray-300">
-                      <User className="w-32 h-32" />
+                      <UserIcon className="w-32 h-32" />
                     </div>
                   )}
                   
@@ -155,7 +155,7 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                     <StatBox icon={<Globe className="w-5 h-5" />} label="الجنسية" value={worker.Nationality} color="emerald" />
                     <StatBox icon={<BookOpen className="w-5 h-5" />} label="الديانة" value={worker.Religion} color="purple" />
                     <StatBox icon={<Heart className="w-5 h-5" />} label="الحالة" value={worker.Marital_Status} color="pink" />
-                    <StatBox icon={<User className="w-5 h-5" />} label="الأطفال" value={worker.Number_Of_Children} color="orange" />
+                    <StatBox icon={<UserIcon className="w-5 h-5" />} label="الأطفال" value={worker.Number_Of_Children} color="orange" />
                     <StatBox icon={<Award className="w-5 h-5" />} label="الخبرة" value={worker.Experience === 'Experienced' ? 'خبيرة' : 'مبتدئة'} color="amber" />
                   </div>
                 </div>
@@ -233,7 +233,7 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                   <p className="text-blue-200 font-black uppercase tracking-widest text-sm">وكالة التوظيف المعتمدة</p>
                   <h3 className="text-2xl sm:text-3xl font-black">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h3>
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-blue-100 text-sm font-bold pt-2">
-                    <span className="flex items-center gap-2"><User className="w-4 h-4" /> المسؤول: {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</span>
+                    <span className="flex items-center gap-2"><UserIcon className="w-4 h-4" /> المسؤول: {import.meta.env.VITE_OFFICE_MANAGER || 'عادل'}</span>
                     <span className="flex items-center gap-2">📍 {import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31'}</span>
                     <span dir="ltr" className="flex items-center gap-2">📱 {import.meta.env.VITE_WHATSAPP_NUMBER || '+971508368230'}</span>
                   </div>
@@ -309,7 +309,7 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
               <img src={profileImage} alt="" className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
-                <User className="w-20 h-20" />
+                <UserIcon className="w-20 h-20" />
               </div>
             )}
           </div>

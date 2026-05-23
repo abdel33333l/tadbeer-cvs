@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
-import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight } from 'lucide-react';
+import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'tadbeer2024';
@@ -226,7 +226,7 @@ const AdminPage = () => {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                    <User className="w-6 h-6" />
+                    <UserIcon className="w-6 h-6" />
                   </div>
                   <h2 className="text-lg font-bold text-primary">إدارة العاملات ({workers.length})</h2>
                 </div>

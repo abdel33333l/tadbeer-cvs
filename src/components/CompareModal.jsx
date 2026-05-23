@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Check, Minus, User } from 'lucide-react';
+import { X, Check, Minus, User as UserIcon } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 
 const CompareModal = ({ workers, isOpen, onClose }) => {
@@ -50,7 +50,7 @@ const CompareModal = ({ workers, isOpen, onClose }) => {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
-                            <User className="w-10 h-10" />
+                            <UserIcon className="w-10 h-10" />
                           </div>
                         )}
                       </div>

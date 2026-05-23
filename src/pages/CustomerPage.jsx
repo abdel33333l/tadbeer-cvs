@@ -6,7 +6,7 @@ import FilterSidebar from '../components/FilterSidebar';
 import WorkerCard from '../components/WorkerCard';
 import CVModal from '../components/CVModal';
 import CompareModal from '../components/CompareModal';
-import { Settings, User, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2 } from 'lucide-react';
+import { Settings, User as UserIcon, Filter, Share2, Search, X, Loader2, Copy, CheckCircle2 } from 'lucide-react';
 
 import ShortlistBar from '../components/ShortlistBar';
 
@@ -116,7 +116,7 @@ const CustomerPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center space-y-6 bg-surface">
         <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
-          <User className="w-12 h-12 text-primary" />
+          <UserIcon className="w-12 h-12 text-primary" />
         </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-primary">{import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}</h1>
@@ -139,7 +139,7 @@ const CustomerPage = () => {
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 rounded-full text-white text-sm font-black">
-              <User className="w-4 h-4" />
+              <UserIcon className="w-4 h-4" />
               <span>{(import.meta.env.VITE_OFFICE_MANAGER || 'عادل')} — {(import.meta.env.VITE_OFFICE_LOCATION || 'مكتب 31')}</span>
             </div>
             <Link to="/admin-tadbeer" className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-90" title="Settings">
