@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { supabase } from '../lib/supabase';
-import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon, Loader2 } from 'lucide-react';
+import { Upload, LogOut, Save, PieChart, Trash2, ArrowRight, User as UserIcon, Loader2, AlertTriangle, RefreshCcw, CheckCircle2, X } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'tadbeer2024';
 
 const AdminPage = () => {
   const navigate = useNavigate();
-  const { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData } = useWorkers();
+  const { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData, deleteWorker, addWorker } = useWorkers();
   
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('tadbeer_auth') === 'true');
   const [password, setPassword] = useState('');
@@ -20,12 +20,16 @@ const AdminPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tempWhatsapp, setTempWhatsapp] = useState(whatsappNumber || '');
+  
+  // New Workflow States
+  const [uploadMode, setUploadMode] = useState('upsert'); // 'upsert' or 'replace'
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmInput, setConfirmInput] = useState('');
 
   useEffect(() => {
     document.title = `لوحة الإدارة | ${import.meta.env.VITE_OFFICE_NAME || 'تدبير بوابه الشرق مول'}`;
   }, []);
 
-  // Synchronize tempWhatsapp ONLY on initial mount/data load, not on every render
   useEffect(() => {
     if (whatsappNumber && !tempWhatsapp) {
       setTempWhatsapp(whatsappNumber);
@@ -93,12 +97,7 @@ const AdminPage = () => {
     }
   };
 
-  const handleUpload = async () => {
-    if (!jsonFile) {
-      setUploadStatus({ success: false, message: 'يرجى اختيار ملف JSON أولاً' });
-      return;
-    }
-
+  const executeUpload = async () => {
     setIsUploading(true);
     setCurrentProgress('بدء المعالجة...');
     setUploadStatus(null);
@@ -106,7 +105,7 @@ const AdminPage = () => {
     try {
       const result = await uploadData(jsonFile, pdfFile, (progress) => {
         setCurrentProgress(progress);
-      });
+      }, uploadMode);
       
       setUploadStatus({ 
         success: true, 
@@ -115,6 +114,7 @@ const AdminPage = () => {
             <span className="text-lg font-black">✓ اكتملت العملية بنجاح</span>
             <span className="text-sm">إجمالي العاملات: {result.total}</span>
             <span className="text-sm text-green-600 font-bold">تم الرفع بنجاح: {result.success}</span>
+            <span className="text-sm text-blue-600 font-bold">تم استخراج {result.images} صورة</span>
             {result.failed > 0 && <span className="text-sm text-red-600 font-bold">فشل رفع: {result.failed}</span>}
           </div>
         )
@@ -123,14 +123,29 @@ const AdminPage = () => {
       setPdfFile(null);
       setCurrentProgress('');
     } catch (err) {
-      console.error('Upload catch block:', err);
+      console.error('Upload Error:', err);
       setUploadStatus({ 
         success: false, 
-        message: `فشل العملية: ${err.message || 'خطأ غير معروف'}. يرجى التحقق من الكونسول للمزيد من التفاصيل.` 
+        message: `فشل العملية: ${err.message || 'خطأ غير معروف'}` 
       });
       setCurrentProgress('');
     } finally {
       setIsUploading(false);
+      setIsConfirmModalOpen(false);
+      setConfirmInput('');
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (!jsonFile) {
+      setUploadStatus({ success: false, message: 'يرجى اختيار ملف JSON أولاً' });
+      return;
+    }
+
+    if (uploadMode === 'replace') {
+      setIsConfirmModalOpen(true);
+    } else {
+      executeUpload();
     }
   };
 
@@ -176,7 +191,6 @@ const AdminPage = () => {
     );
   }
 
-  // Stats Breakdown
   const nationalityStats = workers.reduce((acc, w) => {
     acc[w.Nationality] = (acc[w.Nationality] || 0) + 1;
     return acc;
@@ -211,25 +225,45 @@ const AdminPage = () => {
 
       <main className="container mx-auto p-4 sm:p-8 space-y-8 max-w-6xl">
         {uploadStatus && (
-          <div className={`p-4 rounded-lg border flex items-center justify-between ${uploadStatus.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-            <span className="font-bold">{uploadStatus.message}</span>
-            <button onClick={() => setUploadStatus(null)} className="text-sm">إغلاق</button>
+          <div className={`p-4 rounded-xl border flex items-start justify-between ${uploadStatus.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'} animate-in slide-in-from-top-4 duration-300 shadow-sm`}>
+            <div className="flex items-start gap-3">
+              {uploadStatus.success ? <CheckCircle2 className="w-5 h-5 mt-0.5" /> : <AlertTriangle className="w-5 h-5 mt-0.5" />}
+              <div className="font-bold">{uploadStatus.message}</div>
+            </div>
+            <button onClick={() => setUploadStatus(null)} className="p-1 hover:bg-black/5 rounded-full"><X className="w-4 h-4" /></button>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Controls */}
           <div className="lg:col-span-2 space-y-8">
             {/* Upload Section */}
             <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-accent/10 rounded-lg">
-                  <Upload className="w-6 h-6 text-accent" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <Upload className="w-6 h-6 text-accent" />
+                  </div>
+                  <h2 className="text-lg font-bold text-primary">رفع البيانات (JSON + PDF)</h2>
                 </div>
-                <h2 className="text-lg font-bold text-primary">رفع البيانات (JSON + PDF)</h2>
               </div>
               
               <div className="space-y-6">
+                {/* Mode Selector */}
+                <div className="grid grid-cols-2 gap-3 p-1 bg-gray-100 rounded-xl">
+                  <button 
+                    onClick={() => setUploadMode('upsert')}
+                    className={`py-3 rounded-lg text-sm font-black transition-all ${uploadMode === 'upsert' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    إضافة / تحديث
+                  </button>
+                  <button 
+                    onClick={() => setUploadMode('replace')}
+                    className={`py-3 rounded-lg text-sm font-black transition-all ${uploadMode === 'replace' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    استبدال الكل
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* JSON Input */}
                   <div className={`border-2 border-dashed rounded-xl p-6 text-center space-y-2 transition-colors relative ${jsonFile ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-accent'}`}>
@@ -252,24 +286,23 @@ const AdminPage = () => {
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <p className="text-sm font-bold text-gray-700">{pdfFile ? pdfFile.name : 'ملف الـ PDF (اختياري)'}</p>
-                    <p className="text-[10px] text-gray-400">لاستخراج الخبرة السابقة</p>
+                    <p className="text-[10px] text-gray-400">للبحث عن الصور والخبرة</p>
                   </div>
-
                 </div>
 
                 <button 
-                  onClick={handleUpload}
+                  onClick={handleUploadClick}
                   disabled={!jsonFile || isUploading}
-                  className={`w-full py-4 rounded-xl font-black text-white transition-all flex items-center justify-center gap-2 ${!jsonFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-accent hover:bg-opacity-90 shadow-xl shadow-accent/20'}`}
+                  className={`w-full py-4 rounded-xl font-black text-white transition-all flex items-center justify-center gap-2 ${!jsonFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : uploadMode === 'replace' ? 'bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20' : 'bg-accent hover:bg-opacity-90 shadow-xl shadow-accent/20'}`}
                 >
                   {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                  {isUploading ? 'جاري المعالجة...' : 'بدء عملية الرفع والمعالجة'}
+                  {uploadMode === 'replace' ? 'بدء عملية الاستبدال الكامل' : 'بدء عملية الرفع والتحديث'}
                 </button>
 
                 {isUploading && currentProgress && (
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center gap-3 animate-pulse">
-                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" />
-                    <p className="text-sm font-bold text-blue-700">{currentProgress}</p>
+                  <div className={`p-4 rounded-xl flex items-center gap-3 animate-pulse border ${uploadMode === 'replace' ? 'bg-red-50 border-red-100 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
+                    <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+                    <p className="text-sm font-bold">{currentProgress}</p>
                   </div>
                 )}
               </div>
@@ -391,77 +424,126 @@ const AdminPage = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-surface p-4 rounded-lg">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">إجمالي العاملات</p>
+                <div className="bg-surface p-4 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-400 font-black uppercase">إجمالي العاملات</p>
                   <p className="text-2xl font-black text-primary">{workers.length}</p>
                 </div>
-                <div className="bg-surface p-4 rounded-lg">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">آخر تحديث</p>
-                  <p className="text-xs font-bold text-primary mt-2">اليوم</p>
+                <div className="bg-surface p-4 rounded-lg text-center">
+                  <p className="text-[10px] text-gray-400 font-black uppercase">آخر تحديث</p>
+                  <p className="text-xs font-black text-primary mt-2">اليوم</p>
                 </div>
               </div>
 
               <div className="mt-8 space-y-6">
                 <div>
-                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3">حسب الجنسية</h3>
+                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3 tracking-widest uppercase">حسب الجنسية</h3>
                   <div className="space-y-2">
                     {Object.entries(nationalityStats).map(([nat, count]) => (
                       <div key={nat} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-medium">{nat}</span>
-                        <span className="font-bold text-primary">{count}</span>
+                        <span className="text-gray-600 font-bold">{nat}</span>
+                        <span className="font-black text-primary bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">{count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3">مستوى الخبرة</h3>
+                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3 tracking-widest uppercase">مستوى الخبرة</h3>
                   <div className="space-y-2">
                     {Object.entries(expStats).map(([exp, count]) => (
                       <div key={exp} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-medium">{exp}</span>
-                        <span className="font-bold text-primary">{count}</span>
+                        <span className="text-gray-600 font-bold">{exp}</span>
+                        <span className="font-black text-primary bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">{count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-xs font-black text-gray-400 border-b pb-2 mb-3 tracking-widest uppercase">صيانة البيانات</h3>
-                  <div className="space-y-3">
-                    <button 
-                      onClick={handleRecalculateData}
-                      disabled={isProcessing || isUploading}
-                      className={`w-full py-3 rounded-lg font-black text-white text-xs transition-all flex items-center justify-center gap-2 ${isProcessing || isUploading ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-600/20'}`}
-                    >
-                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      إعادة معالجة المهارات واللغات
-                    </button>
+                <div className="pt-4 border-t border-gray-50 space-y-4">
+                  <h3 className="text-xs font-black text-gray-400 tracking-widest uppercase">صيانة البيانات</h3>
+                  
+                  <button 
+                    onClick={handleRecalculateData}
+                    disabled={isProcessing || isUploading}
+                    className={`w-full py-3 rounded-lg font-black text-white text-xs transition-all flex items-center justify-center gap-2 ${isProcessing || isUploading ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-600/20'}`}
+                  >
+                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+                    إعادة معالجة المهارات
+                  </button>
 
-                    {isProcessing && currentProgress && (
-                      <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 text-purple-500 animate-spin flex-shrink-0" />
-                        <p className="text-[10px] font-bold text-purple-700">{currentProgress}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-6">
-                  <button
-                    onClick={() => { if(window.confirm('هل أنت متأكد من مسح جميع البيانات؟')) clearAllData(); }}
-                    className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  <button 
+                    onClick={() => {
+                       setUploadMode('replace');
+                       setIsConfirmModalOpen(true);
+                    }}
+                    className="w-full py-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-xs font-black hover:bg-red-100 transition-all flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
                     مسح جميع البيانات
                   </button>
-                </div>
 
+                  {isProcessing && currentProgress && (
+                    <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg flex items-center gap-2 animate-pulse">
+                      <Loader2 className="w-3 h-3 text-purple-500 animate-spin flex-shrink-0" />
+                      <p className="text-[10px] font-bold text-purple-700">{currentProgress}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal */}
+      {isConfirmModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-black text-primary">تأكيد الحذف النهائي</h2>
+                <p className="text-sm text-gray-500 font-bold leading-relaxed">
+                  سيتم حذف جميع العاملات الحالية واستبدالها بالملف الجديد. هل أنت متأكد؟ لا يمكن التراجع عن هذه الخطوة.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">اكتب كلمة "حذف" للتأكيد</p>
+              <input 
+                type="text" 
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder='اكتب "حذف" هنا'
+                className="w-full px-4 py-4 bg-gray-50 border-2 border-red-100 rounded-xl outline-none focus:border-red-500 text-center font-black"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => {
+                  setIsConfirmModalOpen(false);
+                  setConfirmInput('');
+                }}
+                className="py-4 bg-gray-100 text-gray-600 rounded-xl font-black hover:bg-gray-200 transition-all"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={executeUpload}
+                disabled={confirmInput !== 'حذف' && confirmInput !== 'DELETE'}
+                className={`py-4 rounded-xl font-black text-white transition-all ${confirmInput === 'حذف' || confirmInput === 'DELETE' ? 'bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20' : 'bg-gray-200 cursor-not-allowed'}`}
+              >
+                تأكيد واستبدال
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -17,18 +17,17 @@ const dataUrlToBlob = async (dataUrl) => {
 
 // Supported Supabase columns
 const VALID_COLUMNS = [
-  'worker_code', 'name', 'nationality', 'age', 'religion', 
-  'marital_status', 'experience', 'skills', 'languages', 
-  'portrait_image_url', 'full_body_image_url', 'work_experience', 
-  'previous_experience_country', 'passport_number', 'date_of_birth', 
-  'place_of_birth', 'phone', 'mobile', 'raw_data'
+  'worker_code', 'name', 'nationality', 'country', 'age', 'religion', 
+  'marital_status', 'experience', 'previous_experience_country', 'work_experience', 
+  'previous_experience', 'experience_details', 'skills', 'languages', 
+  'salary', 'guarantee', 'status', 'portrait_image_url', 'full_body_image_url', 
+  'passport_number', 'date_of_birth', 'place_of_birth', 'phone', 'mobile', 'raw_data'
 ];
 
 export const useWorkers = () => {
   const [workers, setWorkers] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState(DEFAULT_WHATSAPP);
   const [isLoading, setIsLoading] = useState(true);
-  const [uploadProgress, setUploadStatus] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -48,31 +47,19 @@ export const useWorkers = () => {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const mappedWorkers = data.map(w => {
-          const normalizedSkills = getNormalizedSkills(w);
-          const normalizedLangs = getNormalizedLanguages(w);
-          
-          if (normalizedSkills.length === 0 || normalizedLangs.length === 0) {
-            console.warn(`Data Warning for Worker ${w.worker_code}:`, {
-              skills: normalizedSkills,
-              langs: normalizedLangs,
-              raw_keys: Object.keys(w.raw_data || {})
-            });
-          }
-
-          return {
-            ...w.raw_data,
-            id: w.id,
-            worker_id_db: w.id,
-            portraitImage: w.portrait_image_url,
-            fullBodyImage: w.full_body_image_url,
-            Photo: w.portrait_image_url,
-            Full_Image: w.full_body_image_url,
-            Skills: normalizedSkills,
-            Languages: normalizedLangs,
-            WorkExperience: w.work_experience || []
-          };
-        });
+        const mappedWorkers = data.map(w => ({
+          ...w.raw_data,
+          ...w, // Use clean fields from DB
+          id: w.id,
+          worker_id_db: w.id,
+          portraitImage: w.portrait_image_url,
+          fullBodyImage: w.full_body_image_url,
+          Photo: w.portrait_image_url,
+          Full_Image: w.full_body_image_url,
+          Skills: w.skills || [],
+          Languages: w.languages || [],
+          WorkExperience: w.work_experience || []
+        }));
         setWorkers(mappedWorkers);
       } else {
         await runMigration();
@@ -106,8 +93,15 @@ export const useWorkers = () => {
   const normalizeWorker = (raw) => {
     // 1. Map fields flexibly
     const name = raw.name || raw.Name || raw.fullName || raw["Worker Name"] || raw["Worker_Name"] || "N/A";
-    const worker_code = raw.worker_code || raw.code || raw.ref || raw.id || raw["Ref No"] || raw["Worker No"] || raw["Worker_No"] || `W-${Math.random().toString(36).substr(2, 9)}`;
+    let worker_code = raw.worker_code || raw.code || raw.ref || raw.id || raw["Ref No"] || raw["Worker No"] || raw["Worker_No"];
+    
+    // Auto-generate worker code if missing
+    if (!worker_code) {
+       worker_code = `W${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    }
+    
     const nationality = raw.nationality || raw.country || raw.Nationality || raw["Nationality"] || "N/A";
+    const country = raw.country || raw.Country || raw["Country"] || "";
     const religion = raw.religion || raw.Religion || raw["Religion"] || "N/A";
     const age = parseInt(raw.age || raw.Age || raw["Age"]) || null;
     const marital_status = raw.marital_status || raw.maritalStatus || raw["Marital Status"] || raw["Marital_Status"] || "N/A";
@@ -115,17 +109,14 @@ export const useWorkers = () => {
     const passport_number = raw.passport_number || raw.passportNo || raw["Passport No"] || raw["Passport_Number"] || "";
     const date_of_birth = raw.date_of_birth || raw.dob || raw["Date of Birth"] || raw["Date_Of_Birth"] || "";
     const place_of_birth = raw.place_of_birth || raw.pob || raw["Place of Birth"] || raw["Place_Of_Birth"] || "";
+    const salary = raw.salary || raw.Salary || raw["Salary"] || null;
+    const guarantee = raw.guarantee || raw.Guarantee || raw["Guarantee"] || "سنتين";
+    const status = raw.status || raw.Status || raw["Status"] || "available";
 
     // 2. Map skills and languages using robust helpers
     const skills = getNormalizedSkills(raw);
     const languages = getNormalizedLanguages(raw);
     const phone = getWorkerPhone(raw);
-
-    // Temporary debug only in development
-    if (import.meta.env.DEV) {
-      console.log(`Normalized skills for ${worker_code}:`, skills);
-      console.log(`Normalized languages for ${worker_code}:`, languages);
-    }
 
     const work_experience = raw.WorkExperience || raw.work_experience || [];
     const previous_experience_country = raw.previous_experience_country || (work_experience.length > 0 ? work_experience[0].country : null);
@@ -134,21 +125,27 @@ export const useWorkers = () => {
       worker_code,
       name,
       nationality,
+      country,
       age,
       religion,
       marital_status,
       experience,
       skills,
       languages,
+      salary,
+      guarantee,
+      status,
       passport_number,
       date_of_birth,
       place_of_birth,
       work_experience,
+      previous_experience: raw.previous_experience || [],
+      experience_details: raw.experience_details || "",
       previous_experience_country,
       phone,
       mobile: phone,
-      portrait_image_url: raw.portraitImage || raw.Photo || null,
-      full_body_image_url: raw.fullBodyImage || raw.Full_Image || null,
+      portrait_image_url: raw.portraitImage || raw.Photo || raw.portrait_image_url || null,
+      full_body_image_url: raw.fullBodyImage || raw.Full_Image || raw.full_body_image_url || null,
       raw_data: raw
     };
   };
@@ -158,7 +155,6 @@ export const useWorkers = () => {
     
     try {
       const blob = await dataUrlToBlob(dataUrl);
-      // Use clean folder structure: worker_code/portrait.jpg
       const fileName = `${workerNo}/${type}.jpg`;
       
       const { error: uploadError } = await supabase.storage
@@ -208,7 +204,9 @@ export const useWorkers = () => {
         .single();
 
       if (error) {
-        console.error(`Supabase Upsert Error for ${normalized.worker_code}:`, error);
+        if (error.message?.includes('column')) {
+           throw new Error(`قاعدة البيانات غير محدثة. يرجى إضافة العمود: ${error.message.split('"')[1]}`);
+        }
         throw error;
       }
       
@@ -220,7 +218,7 @@ export const useWorkers = () => {
     }
   };
 
-  const uploadData = async (jsonFile, pdfFile = null, onProgress) => {
+  const uploadData = async (jsonFile, pdfFile = null, onProgress, mode = 'upsert') => {
     setIsLoading(true);
     try {
       // STEP 1: JSON Reading
@@ -230,7 +228,6 @@ export const useWorkers = () => {
         const jsonText = await jsonFile.text();
         jsonData = JSON.parse(jsonText);
       } catch (e) {
-        console.error('JSON Parse Error:', e);
         throw new Error('تنسيق ملف JSON غير صحيح');
       }
 
@@ -243,39 +240,58 @@ export const useWorkers = () => {
       else if (jsonData.results && Array.isArray(jsonData.results)) workersArray = jsonData.results;
       else throw new Error("تنسيق ملف JSON غير مدعوم");
 
-      // DEBUG: Log first raw worker to identify keys
-      if (workersArray.length > 0) {
+      if (workersArray.length === 0) throw new Error("الملف لا يحتوي على أي عاملات");
+
+      // DEBUG
+      if (import.meta.env.DEV) {
         console.log("FIRST RAW WORKER:", workersArray[0]);
-        console.log("FIRST RAW WORKER KEYS:", Object.keys(workersArray[0]));
       }
 
-      onProgress?.(`تم العثور على ${workersArray.length} عاملة. جاري معالجة البيانات...`);
+      onProgress?.(`تم التحقق من البيانات. (العدد: ${workersArray.length})`);
 
-      // STEP 3: PDF Processing (Optional)
+      // STEP 3: Replace Mode Cleanup
+      if (mode === 'replace') {
+        onProgress?.('جاري حذف البيانات القديمة...');
+        const { error: delError } = await supabase
+          .from('workers')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        
+        if (delError) throw new Error("فشل حذف البيانات القديمة");
+        
+        // Storage cleanup attempt
+        try {
+          const { data: files } = await supabase.storage.from('worker-images').list();
+          if (files && files.length > 0) {
+             // Supabase storage delete is complex for nested folders, skipping for safety 
+             // unless we specifically list all worker folders. 
+             // Just warn if needed or implement recursion.
+          }
+        } catch (e) { console.warn("Storage cleanup skipped", e); }
+      }
+
+      // STEP 4: PDF Processing (Optional)
       let pdfPages = [];
       if (pdfFile) {
-        onProgress?.('جاري استخراج البيانات من ملف PDF...');
+        onProgress?.('جاري استخراج البيانات والصور من ملف PDF...');
         try {
           pdfPages = await parsePdfForWorkerData(pdfFile);
-          onProgress?.(`تمت معالجة ${pdfPages.length} صفحة من ملف PDF.`);
         } catch (e) {
-          console.warn('PDF processing failed, skipping PDF data:', e);
-          onProgress?.('تنبيه: فشل استخراج بيانات PDF، سيتم رفع بيانات JSON فقط.');
+          onProgress?.('تنبيه: فشل معالجة PDF، سيتم رفع البيانات النصية فقط.');
         }
       }
 
-      // STEP 4: Merge & Upload
+      // STEP 5: Main Upload Loop
       let successCount = 0;
-      let imgWarning = false;
+      let imgCount = 0;
 
       for (let i = 0; i < workersArray.length; i++) {
         const rawWorker = workersArray[i];
-        onProgress?.(`جاري رفع العاملة ${i + 1} من ${workersArray.length}...`);
+        onProgress?.(`جاري معالجة ورفع العاملة ${i + 1} من ${workersArray.length}...`);
 
-        // Match with PDF data if available
         if (pdfPages.length > 0) {
-          const passport = (rawWorker.Passport_Number || rawWorker.passport_number || "").toUpperCase().replace(/\s+/g, '');
-          const workerNo = (rawWorker.Worker_No || rawWorker.worker_code || "").toUpperCase().replace(/\s+/g, '');
+          const passport = (rawWorker.Passport_Number || rawWorker.passport_number || rawWorker["Passport No"] || "").toUpperCase().replace(/\s+/g, '');
+          const workerNo = (rawWorker.Worker_No || rawWorker.worker_code || rawWorker["Ref No"] || "").toUpperCase().replace(/\s+/g, '');
           
           const matchingPage = pdfPages.find(p => {
             const normalizedPdfText = (p.rawText || '').replace(/\s+/g, '').toUpperCase();
@@ -288,6 +304,7 @@ export const useWorkers = () => {
             rawWorker.WorkExperience = matchingPage.experience;
             rawWorker.portraitImage = matchingPage.profileImage;
             rawWorker.fullBodyImage = matchingPage.fullBodyImage;
+            if (matchingPage.profileImage) imgCount++;
           }
         }
 
@@ -295,20 +312,20 @@ export const useWorkers = () => {
           await addWorker(rawWorker, false);
           successCount++;
         } catch (e) {
-          console.error(`Failed to upload worker ${i}:`, e);
+          console.error(`Failed at worker ${i}:`, e);
         }
       }
 
       await fetchData();
-      onProgress?.('تم الرفع بنجاح!');
       
       return {
         total: workersArray.length,
         success: successCount,
-        failed: workersArray.length - successCount
+        failed: workersArray.length - successCount,
+        images: imgCount
       };
     } catch (err) {
-      console.error('Final Upload Process Error:', err);
+      console.error('Upload Error:', err);
       throw err;
     } finally {
       setIsLoading(false);
@@ -317,11 +334,7 @@ export const useWorkers = () => {
 
   const deleteWorker = async (id) => {
     try {
-      const { error } = await supabase
-        .from('workers')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('workers').delete().eq('id', id);
       if (error) throw error;
       setWorkers(prev => prev.filter(w => w.worker_id_db !== id));
     } catch (err) {
@@ -341,9 +354,7 @@ export const useWorkers = () => {
         .from('workers')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
-
       if (error) throw error;
-      await del(WORKERS_KEY);
       setWorkers([]);
     } catch (err) {
       console.error('Clear failed:', err);
@@ -351,5 +362,5 @@ export const useWorkers = () => {
     }
   };
 
-  return { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData, deleteWorker, addWorker, uploadProgress };
+  return { workers, whatsappNumber, isLoading, uploadData, updateWhatsapp, clearAllData, deleteWorker, addWorker };
 };
