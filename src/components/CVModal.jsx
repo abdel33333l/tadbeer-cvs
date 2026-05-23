@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Printer, MessageCircle, Phone, PhoneCall, ZoomIn, Calendar, Globe, User as UserIcon, BookOpen, Briefcase, Ruler, Weight, Activity, Heart, Award } from 'lucide-react';
 import { getFlagEmoji } from '../utils/flags';
 import { buildWhatsAppUrl, buildOfficeWhatsAppUrl } from '../utils/whatsapp';
+import { getNormalizedSkills, getNormalizedLanguages } from '../utils/normalization';
 
 const formatPeriod = (raw) => {
   if (!raw) return '';
@@ -51,6 +52,9 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
     worker.Photo;
 
   const isPortraitFallback = !worker.fullBodyImage && !worker.body_image && !worker.Full_Image && (worker.portraitImage || worker.Photo);
+
+  const skills = getNormalizedSkills(worker);
+  const languages = getNormalizedLanguages(worker);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 lg:p-4 backdrop-blur-sm">
@@ -185,15 +189,29 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
                   
                   <DetailCard title="المهارات واللغات">
                     <div className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {worker.Skills.map(skill => (
-                          <span key={skill} className="px-3 py-1.5 bg-primary/5 text-primary text-xs font-black rounded-lg border border-primary/10">{skill}</span>
-                        ))}
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mb-2">المهارات</p>
+                        <div className="flex flex-wrap gap-2">
+                          {skills.length > 0 ? (
+                            skills.map(skill => (
+                              <span key={skill} className="px-3 py-1.5 bg-primary/5 text-primary text-xs font-black rounded-lg border border-primary/10">{skill}</span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">لا توجد مهارات مسجلة</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {worker.Languages.map(lang => (
-                          <span key={lang} className="px-3 py-1.5 bg-accent/5 text-accent text-xs font-black rounded-lg border border-accent/10">{lang}</span>
-                        ))}
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mb-2">اللغات</p>
+                        <div className="flex flex-wrap gap-2">
+                          {languages.length > 0 ? (
+                            languages.map(lang => (
+                              <span key={lang} className="px-3 py-1.5 bg-accent/5 text-accent text-xs font-black rounded-lg border border-accent/10">{lang}</span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">لا توجد لغات مسجلة</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </DetailCard>
@@ -320,11 +338,15 @@ const CVModal = ({ worker, isOpen, onClose, onNext, onPrev, officeWhatsapp }) =>
           <div className="grid grid-cols-2 gap-6">
             <div>
               <h4 className="font-bold border-b border-gray-200 pb-1 mb-2 text-primary">المهارات</h4>
-              <p className="text-sm text-gray-700 leading-relaxed">{worker.Skills.join('، ')}</p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {skills.length > 0 ? skills.join('، ') : 'لا توجد بيانات'}
+              </p>
             </div>
             <div>
               <h4 className="font-bold border-b border-gray-200 pb-1 mb-2 text-primary">اللغات</h4>
-              <p className="text-sm text-gray-700 leading-relaxed">{worker.Languages.join('، ')}</p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {languages.length > 0 ? languages.join('، ') : 'لا توجد بيانات'}
+              </p>
             </div>
           </div>
         </div>

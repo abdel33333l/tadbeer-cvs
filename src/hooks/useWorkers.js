@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { parsePdfForWorkerData, normalizePassport } from '../utils/pdfParser';
+import { getNormalizedSkills, getNormalizedLanguages } from '../utils/normalization';
 import { get, set, del } from 'idb-keyval';
 
 const WORKERS_KEY = 'tadbeer_workers_v3';
@@ -101,21 +102,9 @@ export const useWorkers = () => {
     const date_of_birth = raw.date_of_birth || raw.dob || raw["Date of Birth"] || raw["Date_Of_Birth"] || "";
     const place_of_birth = raw.place_of_birth || raw.pob || raw["Place of Birth"] || raw["Place_Of_Birth"] || "";
 
-    // 2. Map skills and languages
-    let skills = raw.skills || raw.Skills || raw["Skills"] || [];
-    if (typeof skills === 'string') skills = skills.split(',').map(s => s.trim());
-    else if (!Array.isArray(skills)) {
-      // Check for specific SubForm keys from Zoho/Common exports
-      const subFormSkills = raw["Skills_SubForm.English"] || raw["Skills_SubForm"];
-      if (subFormSkills) skills = subFormSkills.split(',').map(s => s.trim());
-    }
-
-    let languages = raw.languages || raw.Languages || raw["Languages"] || [];
-    if (typeof languages === 'string') languages = languages.split(',').map(l => l.trim());
-    else if (!Array.isArray(languages)) {
-      const subFormLangs = raw["Knowledge_Of_Language_SubForm.English"] || raw["Knowledge_Of_Language_SubForm"];
-      if (subFormLangs) languages = subFormLangs.split(',').map(l => l.trim());
-    }
+    // 2. Map skills and languages using robust helpers
+    const skills = getNormalizedSkills(raw);
+    const languages = getNormalizedLanguages(raw);
 
     const work_experience = raw.WorkExperience || raw.work_experience || [];
     const previous_experience_country = raw.previous_experience_country || (work_experience.length > 0 ? work_experience[0].country : null);
